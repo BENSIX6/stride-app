@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell } from "recharts";
+import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell, Legend } from "recharts";
 
 const API = "https://stride-backend-oycv.onrender.com";
 const PROFILE = {
@@ -15,7 +15,6 @@ const PROFILE = {
   },
 };
 
-// ── CSS ────────────────────────────────────────────────────────────────────────
 const css = `
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap');
 :root {
@@ -77,6 +76,10 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);min-height
 .btn:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(14,165,233,.3);}
 .btn:disabled{opacity:.5;cursor:not-allowed;transform:none;}
 .bsm{padding:6px 12px;font-size:12px;border-radius:8px;}
+.filter-bar{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center;}
+.fbtn{padding:7px 14px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--text3);font-size:12px;font-weight:500;cursor:pointer;transition:all .2s;}
+.fbtn:hover{border-color:var(--border2);color:var(--text2);}
+.fbtn.active{border-color:var(--accent);background:rgba(0,212,255,.1);color:var(--accent);}
 .chat{background:var(--bg2);border:1px solid var(--border);border-radius:16px;overflow:hidden;display:flex;flex-direction:column;height:420px;}
 .msgs{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:12px;}
 .msgs::-webkit-scrollbar{width:4px;}
@@ -104,6 +107,9 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);min-height
 .spin{width:20px;height:20px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .8s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
 .conn-banner{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:12px;padding:14px 18px;margin-bottom:20px;font-size:13px;color:#fca5a5;display:flex;align-items:center;gap:10px;}
+.zone-legend{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
+.zone-legend-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text3);}
+.zone-legend-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0;}
 @media(max-width:900px){.g4{grid-template-columns:repeat(2,1fr);}.g3{grid-template-columns:repeat(2,1fr);}.g21{grid-template-columns:1fr;}}
 @media(max-width:600px){.g4,.g3,.g2{grid-template-columns:1fr;}.pt{font-size:32px;}}
 ::-webkit-scrollbar{width:6px;height:6px;}
@@ -111,7 +117,6 @@ body{background:var(--bg);color:var(--text);font-family:var(--font-b);min-height
 ::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px;}
 `;
 
-// ── HELPERS ────────────────────────────────────────────────────────────────────
 const CT = ({ active, payload, label }) => {
   if (!active || !payload?.length) return null;
   return (
@@ -126,7 +131,7 @@ const ZBar = ({ name, value, pct, max, color, unit = "min" }) => (
   <div className="zrow">
     <span className="zn">{name}</span>
     <div className="zbw"><div className="zb" style={{ width: `${max ? (value / max) * 100 : 0}%`, background: color }} /></div>
-    <span className="zt" style={{ width: 70, textAlign: "right", fontSize: 10 }}>
+    <span className="zt" style={{ width: 80, textAlign: "right", fontSize: 10 }}>
       <span style={{ color: "var(--text2)" }}>{value}{unit}</span>
       {pct != null && <span style={{ color: "var(--text3)", marginLeft: 4 }}>({pct}%)</span>}
     </span>
@@ -153,11 +158,34 @@ const badgeClass = (type) => {
   return `badge ${m[type] || "bEF"}`;
 };
 
-// ── API CALLS ──────────────────────────────────────────────────────────────────
 const apiFetch = async (path) => {
   const r = await fetch(`${API}${path}`);
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
   return r.json();
+};
+
+// ── ZONE LEGEND ───────────────────────────────────────────────────────────────
+const ZoneLegend = () => (
+  <div className="zone-legend">
+    {Object.entries(PROFILE.zones).map(([k, z]) => (
+      <div key={k} className="zone-legend-item">
+        <div className="zone-legend-dot" style={{ background: z.color }} />
+        <span>{z.name}</span>
+      </div>
+    ))}
+  </div>
+);
+
+// ── CUSTOM BAR LABEL ──────────────────────────────────────────────────────────
+const CustomBarLabel = ({ x, y, width, height, value, total }) => {
+  if (!value || !total || height < 14) return null;
+  const pct = Math.round((value / total) * 100);
+  if (pct < 8) return null;
+  return (
+    <text x={x + width / 2} y={y + height / 2 + 4} fill="rgba(255,255,255,0.7)" textAnchor="middle" fontSize={9} fontWeight={600}>
+      {pct}%
+    </text>
+  );
 };
 
 // ── DASHBOARD ─────────────────────────────────────────────────────────────────
@@ -178,13 +206,23 @@ const Dashboard = ({ connected }) => {
 
   const cw = summary?.current_week || {};
   const cm = summary?.current_month || {};
-  const pm = summary?.prev_month || {};
-  const pmLabel = summary?.prev_month_label || "Mars 2024";
+  const smp = summary?.same_month_prev_year || {};
+  const smpLabel = summary?.same_month_prev_year_label || "Mars 2025";
+  const diffKm = summary?.month_diff_km ?? 0;
+  const diffPct = summary?.month_diff_pct ?? 0;
+  const ytd = summary?.ytd || {};
+  const ytdPrev = summary?.ytd_prev || {};
+  const ytdLabel = summary?.ytd_label || "YTD 2026";
+  const ytdPrevLabel = summary?.ytd_prev_label || "YTD 2025";
   const wd = summary?.wellness_today || {};
-  const diff = ((cm.km || 0) - (pm.km || 0)).toFixed(1);
-  const diffPct = pm.km ? (((cm.km - pm.km) / pm.km) * 100).toFixed(1) : 0;
   const lastWeek = weekly[weekly.length - 1] || {};
   const maxZ = Math.max(lastWeek.z1||0, lastWeek.z2||0, lastWeek.z3||0, lastWeek.z4||0, lastWeek.z5||0);
+
+  // Pour les % dans le graphe 12 semaines
+  const weeklyWithPct = weekly.map(w => {
+    const total = (w.z1||0)+(w.z2||0)+(w.z3||0)+(w.z4||0)+(w.z5||0);
+    return { ...w, _total: total };
+  });
 
   return (
     <div>
@@ -212,19 +250,64 @@ const Dashboard = ({ connected }) => {
           <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 6 }}>{cm.sessions || 0} séances</div>
         </div>
         <div className="card">
-          <div className="lbl">{pmLabel}</div>
-          <div className="val">{pm.km || 0}<span className="unit">km</span></div>
-          <div className="pb"><div className="pf" style={{ width: `${Math.min((pm.km||0)/150*100, 100)}%`, background:"linear-gradient(90deg,#1a3354,#1a56db)" }} /></div>
-          <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 6 }}>{pm.sessions || 0} séances</div>
+          <div className="lbl">{smpLabel} (complet)</div>
+          <div className="val">{smp.km || 0}<span className="unit">km</span></div>
+          <div className="pb"><div className="pf" style={{ width: `${Math.min((smp.km||0)/150*100, 100)}%`, background:"linear-gradient(90deg,#1a3354,#1a56db)" }} /></div>
+          <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 6 }}>{smp.sessions || 0} séances · mois complet</div>
         </div>
         <div className="card">
-          <div className="lbl">vs {pmLabel}</div>
-          <div className="val" style={{ color: diff >= 0 ? "var(--green)" : "var(--red)" }}>
-            {diff >= 0 ? "+" : ""}{diff}<span className="unit">km</span>
+          <div className="lbl">vs {smpLabel}</div>
+          <div className="val" style={{ color: diffKm >= 0 ? "var(--green)" : "var(--red)" }}>
+            {diffKm >= 0 ? "+" : ""}{diffKm}<span className="unit">km</span>
           </div>
-          <div style={{ fontSize: 12, color: diff >= 0 ? "var(--green)" : "var(--red)", marginTop: 6 }}>
-            {diff >= 0 ? "↑" : "↓"} {Math.abs(diffPct)}% N-1
+          <div style={{ fontSize: 12, color: diffKm >= 0 ? "var(--green)" : "var(--red)", marginTop: 6 }}>
+            {diffKm >= 0 ? "↑" : "↓"} {Math.abs(diffPct)}% vs mois complet N-1
           </div>
+        </div>
+      </div>
+
+      <div className="sec">YTD</div>
+      <div className="grid g4" style={{ marginBottom: 16 }}>
+        <div className="card ca">
+          <div className="lbl">{ytdLabel}</div>
+          <div className="val">{ytd.km || 0}<span className="unit">km</span></div>
+          <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 6 }}>{ytd.sessions || 0} séances depuis le 1er jan.</div>
+        </div>
+        <div className="card">
+          <div className="lbl">{ytdPrevLabel}</div>
+          <div className="val">{ytdPrev.km || 0}<span className="unit">km</span></div>
+          <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 6 }}>{ytdPrev.sessions || 0} séances · même période</div>
+        </div>
+        <div className="card">
+          <div className="lbl">Écart YTD</div>
+          {(() => {
+            const d = ((ytd.km||0) - (ytdPrev.km||0)).toFixed(1);
+            const p = ytdPrev.km ? (((ytd.km||0) - ytdPrev.km) / ytdPrev.km * 100).toFixed(1) : 0;
+            return (
+              <>
+                <div className="val" style={{ color: d >= 0 ? "var(--green)" : "var(--red)" }}>
+                  {d >= 0 ? "+" : ""}{d}<span className="unit">km</span>
+                </div>
+                <div style={{ fontSize: 12, color: d >= 0 ? "var(--green)" : "var(--red)", marginTop: 6 }}>
+                  {d >= 0 ? "↑" : "↓"} {Math.abs(p)}% vs N-1
+                </div>
+              </>
+            );
+          })()}
+        </div>
+        <div className="card">
+          <div className="sec" style={{ marginBottom: 8 }}>Bien-être</div>
+          {[
+            ["❤ FC repos", wd.resting_hr ? `${wd.resting_hr} bpm` : "--"],
+            ["🔋 Body Battery", wd.body_battery_high != null ? `${wd.body_battery_high}%` : "--"],
+            ["😴 Score sommeil", wd.sleep_score != null ? `${wd.sleep_score}/100` : "--"],
+            ["😤 Stress", wd.stress_avg != null ? `${wd.stress_avg}/100` : "--"],
+          ].map(([l, v]) => (
+            <div key={l} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"4px 0", borderBottom:"1px solid var(--border)", fontSize:12 }}>
+              <span style={{ color:"var(--text3)" }}>{l}</span>
+              <span style={{ color:"var(--text)", fontWeight:600 }}>{v}</span>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -256,27 +339,21 @@ const Dashboard = ({ connected }) => {
             const pct = totalZ ? Math.round((val / totalZ) * 100) : 0;
             return <ZBar key={k} name={z.name} value={val} pct={pct} max={maxZ} color={z.color} />;
           })}
-          <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12, marginTop: 12 }}>
-            <div className="sec" style={{ marginBottom: 8 }}>Intensité</div>
-            {[["🟦 EF", "ef", "#1a56db"], ["🔵 Seuil", "seuil", "#0ea5e9"], ["⚡ VMA", "vma", "#00d4ff"]].map(([n, k, c]) => {
-              const totalInt = (lastWeek.ef||0)+(lastWeek.seuil||0)+(lastWeek.vma||0);
-              const val = lastWeek[k] || 0;
-              const pct = totalInt ? Math.round((val / totalInt) * 100) : 0;
-              return <ZBar key={k} name={n} value={val} pct={pct} max={totalInt} color={c} />;
-            })}
-          </div>
         </div>
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
         <div className="sec">Temps par zone — 12 semaines</div>
-        <ResponsiveContainer width="100%" height={180}>
-          <BarChart data={weekly} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+        <ZoneLegend />
+        <ResponsiveContainer width="100%" height={200}>
+          <BarChart data={weeklyWithPct} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#1a3354" />
             <XAxis dataKey="week_label" tick={{ fill: "#4a7499", fontSize: 11 }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fill: "#4a7499", fontSize: 11 }} axisLine={false} tickLine={false} unit="min" />
             <Tooltip content={<CT />} />
-            <Bar dataKey="z1" stackId="a" fill="#1e3a5f" name="Z1" />
+            <Bar dataKey="z1" stackId="a" fill="#1e3a5f" name="Z1 Récup">
+              {weeklyWithPct.map((entry, i) => <Cell key={i} fill="#1e3a5f" />)}
+            </Bar>
             <Bar dataKey="z2" stackId="a" fill="#1a56db" name="Z2 EF" />
             <Bar dataKey="z3" stackId="a" fill="#0ea5e9" name="Z3 Tempo" />
             <Bar dataKey="z4" stackId="a" fill="#38bdf8" name="Z4 Seuil" />
@@ -285,34 +362,18 @@ const Dashboard = ({ connected }) => {
         </ResponsiveContainer>
       </div>
 
-      <div className="grid g2">
-        <div className="card">
-          <div className="sec">Records personnels</div>
-          {Object.entries(PROFILE.records).map(([d, t]) => (
-            <div key={d} className="ri">
-              <div><div style={{ fontSize: 12, color: "var(--text3)", textTransform: "uppercase", letterSpacing: 1 }}>{d}</div></div>
-              <div style={{ fontFamily: "var(--font-d)", fontSize: 24, color: "var(--accent)" }}>{t}</div>
-            </div>
-          ))}
-          <div style={{ marginTop: 14, padding: "10px 12px", background: "rgba(0,212,255,.05)", borderRadius: 10, border: "1px solid rgba(0,212,255,.15)" }}>
-            <div style={{ fontSize: 10, color: "var(--text3)", letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>Objectif 2026</div>
-            <div style={{ fontFamily: "var(--font-d)", fontSize: 26, color: "var(--accent)" }}>10KM SUB 40:00</div>
-            <div style={{ fontSize: 11, color: "var(--text3)" }}>Allure cible 4:00/km</div>
+      <div className="card">
+        <div className="sec">Records personnels</div>
+        {Object.entries(PROFILE.records).map(([d, t]) => (
+          <div key={d} className="ri">
+            <div><div style={{ fontSize: 12, color: "var(--text3)", textTransform: "uppercase", letterSpacing: 1 }}>{d}</div></div>
+            <div style={{ fontFamily: "var(--font-d)", fontSize: 24, color: "var(--accent)" }}>{t}</div>
           </div>
-        </div>
-        <div className="card">
-          <div className="sec">Bien-être aujourd'hui</div>
-          {[
-            ["❤ FC repos", wd.resting_hr ? `${wd.resting_hr} bpm` : "--"],
-            ["😤 Stress moy.", wd.stress_avg != null ? `${wd.stress_avg}/100` : wd.stress != null ? `${wd.stress}/100` : "--"],
-            ["🔋 Body Battery", wd.body_battery_high != null ? `${wd.body_battery_high}%` : wd.body_battery != null ? `${wd.body_battery}%` : "--"],
-            ["👟 Pas", wd.steps ? `${(wd.steps/1000).toFixed(1)}k` : "--"],
-          ].map(([l, v]) => (
-            <div key={l} className="ri">
-              <span style={{ fontSize: 13, color: "var(--text2)" }}>{l}</span>
-              <span style={{ fontFamily: "var(--font-d)", fontSize: 22, color: "var(--text)" }}>{v}</span>
-            </div>
-          ))}
+        ))}
+        <div style={{ marginTop: 14, padding: "10px 12px", background: "rgba(0,212,255,.05)", borderRadius: 10, border: "1px solid rgba(0,212,255,.15)" }}>
+          <div style={{ fontSize: 10, color: "var(--text3)", letterSpacing: 1, textTransform: "uppercase", marginBottom: 4 }}>Objectif 2026</div>
+          <div style={{ fontFamily: "var(--font-d)", fontSize: 26, color: "var(--accent)" }}>10KM SUB 40:00</div>
+          <div style={{ fontSize: 11, color: "var(--text3)" }}>Allure cible 4:00/km</div>
         </div>
       </div>
     </div>
@@ -328,9 +389,12 @@ const Sessions = () => {
   const [modal, setModal] = useState(null);
   const [tmpFeel, setTmpFeel] = useState(0);
   const [tmpNotes, setTmpNotes] = useState("");
+  const [filterMode, setFilterMode] = useState("ytd");
+  const [filterMonth, setFilterMonth] = useState("");
+  const [filterWeek, setFilterWeek] = useState("");
 
   useEffect(() => {
-    Promise.all([apiFetch("/activities?days=90"), apiFetch("/feedback")])
+    Promise.all([apiFetch("/activities?days=365"), apiFetch("/feedback")])
       .then(([a, f]) => { setActs(a); setFeedbacks(f); })
       .catch(console.error)
       .finally(() => setLoading(false));
@@ -342,22 +406,89 @@ const Sessions = () => {
     setModal(null);
   };
 
+  // Filtrage
+  const today = new Date();
+  const yearStart = `${today.getFullYear()}-01-01`;
+
+  const filteredActs = acts.filter(a => {
+    if (filterMode === "ytd") return a.date >= yearStart;
+    if (filterMode === "month" && filterMonth) return a.date.startsWith(filterMonth);
+    if (filterMode === "week" && filterWeek) {
+      const d = new Date(a.date);
+      const monday = new Date(filterWeek);
+      const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
+      return d >= monday && d <= sunday;
+    }
+    return true;
+  });
+
+  // Générer les mois disponibles
+  const months = [...new Set(acts.map(a => a.date.slice(0,7)))].sort().reverse();
+
+  // Générer les semaines disponibles (lundis)
+  const weeks = [...new Set(acts.map(a => {
+    const d = new Date(a.date);
+    const day = d.getDay();
+    const diff = d.getDate() - (day === 0 ? 6 : day - 1);
+    const monday = new Date(d.setDate(diff));
+    return monday.toISOString().slice(0,10);
+  }))].sort().reverse();
+
   if (loading) return <Loader />;
+
+  const totalKm = filteredActs.reduce((s,a)=>s+a.distance,0);
+  const totalHrs = filteredActs.reduce((s,a)=>s+(a.duration_seconds||0),0) / 3600;
 
   return (
     <div>
       <div className="ph">
-        <div><div className="pt">SÉANCES</div><div className="ps">{acts.length} activités · 90 derniers jours</div></div>
+        <div>
+          <div className="pt">SÉANCES</div>
+          <div className="ps">{filteredActs.length} activités · {totalKm.toFixed(0)}km · {totalHrs.toFixed(1)}h</div>
+        </div>
       </div>
+
+      {/* Filtres */}
+      <div className="filter-bar">
+        <span style={{ fontSize:11, color:"var(--text3)", letterSpacing:1, textTransform:"uppercase" }}>Période :</span>
+        <button className={`fbtn ${filterMode==="ytd"?"active":""}`} onClick={() => setFilterMode("ytd")}>YTD {today.getFullYear()}</button>
+        <button className={`fbtn ${filterMode==="month"?"active":""}`} onClick={() => setFilterMode("month")}>Par mois</button>
+        <button className={`fbtn ${filterMode==="week"?"active":""}`} onClick={() => setFilterMode("week")}>Par semaine</button>
+        {filterMode === "month" && (
+          <select value={filterMonth} onChange={e => setFilterMonth(e.target.value)}
+            style={{ background:"var(--bg3)", border:"1px solid var(--border2)", borderRadius:8, padding:"6px 10px", color:"var(--text)", fontSize:12, outline:"none" }}>
+            <option value="">Choisir un mois</option>
+            {months.map(m => <option key={m} value={m}>{m}</option>)}
+          </select>
+        )}
+        {filterMode === "week" && (
+          <select value={filterWeek} onChange={e => setFilterWeek(e.target.value)}
+            style={{ background:"var(--bg3)", border:"1px solid var(--border2)", borderRadius:8, padding:"6px 10px", color:"var(--text)", fontSize:12, outline:"none" }}>
+            <option value="">Choisir une semaine</option>
+            {weeks.map(w => <option key={w} value={w}>Sem. {w}</option>)}
+          </select>
+        )}
+      </div>
+
       <div className="grid g2" style={{ marginBottom: 20 }}>
         <div className="card">
           <div className="sec">Répartition des types</div>
-          <ResponsiveContainer width="100%" height={180}>
+          {/* Légende couleurs */}
+          <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:8 }}>
+            {[["EF","#1a56db"],["Tempo","#0ea5e9"],["Seuil","#00d4ff"],["Sortie longue","#f59e0b"],["VMA","#38bdf8"]].map(([n,c]) => (
+              <div key={n} style={{ display:"flex", alignItems:"center", gap:4, fontSize:10, color:"var(--text3)" }}>
+                <div style={{ width:8, height:8, borderRadius:2, background:c }} />{n}
+              </div>
+            ))}
+          </div>
+          <ResponsiveContainer width="100%" height={160}>
             <PieChart>
               <Pie data={
-                Object.entries(acts.reduce((acc, a) => { acc[a.type] = (acc[a.type]||0)+1; return acc; }, {}))
+                Object.entries(filteredActs.reduce((acc, a) => { acc[a.type] = (acc[a.type]||0)+1; return acc; }, {}))
                   .map(([n, v]) => ({ name: n, value: v }))
-              } cx="50%" cy="50%" innerRadius={50} outerRadius={75} paddingAngle={3} dataKey="value">
+              } cx="50%" cy="50%" innerRadius={40} outerRadius={65} paddingAngle={3} dataKey="value"
+                label={({ name, percent }) => `${(percent*100).toFixed(0)}%`}
+                labelLine={false}>
                 {["#1a56db","#0ea5e9","#00d4ff","#38bdf8","#f59e0b"].map((c, i) => <Cell key={i} fill={c} />)}
               </Pie>
               <Tooltip contentStyle={{ background: "var(--card2)", border: "1px solid var(--border2)", borderRadius: 8, fontSize: 12 }} />
@@ -365,13 +496,14 @@ const Sessions = () => {
           </ResponsiveContainer>
         </div>
         <div className="card">
-          <div className="sec">Statistiques globales</div>
+          <div className="sec">Statistiques période</div>
           {[
-            ["Distance totale", `${acts.reduce((s,a)=>s+a.distance,0).toFixed(0)} km`],
-            ["Séances EF", acts.filter(a=>a.type==="EF").length],
-            ["Séances intensité", acts.filter(a=>["VMA","Seuil","Tempo"].includes(a.type)).length],
-            ["FC moy. globale", `${Math.round(acts.filter(a=>a.avg_hr).reduce((s,a)=>s+a.avg_hr,0)/acts.filter(a=>a.avg_hr).length)} bpm`],
-            ["Dénivelé total", `${acts.reduce((s,a)=>s+(a.elevation_gain||0),0).toFixed(0)} m`],
+            ["Distance totale", `${totalKm.toFixed(0)} km`],
+            ["Temps total", `${totalHrs.toFixed(1)} h`],
+            ["Séances EF", `${filteredActs.filter(a=>a.type==="EF").length} (${filteredActs.length ? Math.round(filteredActs.filter(a=>a.type==="EF").length/filteredActs.length*100) : 0}%)`],
+            ["Séances intensité", `${filteredActs.filter(a=>["VMA","Seuil","Tempo"].includes(a.type)).length} (${filteredActs.length ? Math.round(filteredActs.filter(a=>["VMA","Seuil","Tempo"].includes(a.type)).length/filteredActs.length*100) : 0}%)`],
+            ["FC moy. globale", filteredActs.filter(a=>a.avg_hr).length ? `${Math.round(filteredActs.filter(a=>a.avg_hr).reduce((s,a)=>s+a.avg_hr,0)/filteredActs.filter(a=>a.avg_hr).length)} bpm` : "--"],
+            ["Dénivelé total", `${filteredActs.reduce((s,a)=>s+(a.elevation_gain||0),0).toFixed(0)} m`],
           ].map(([l,v]) => (
             <div key={l} className="ri">
               <span style={{ fontSize: 12, color: "var(--text3)" }}>{l}</span>
@@ -382,8 +514,9 @@ const Sessions = () => {
       </div>
 
       <div className="sec">Historique</div>
-      {acts.map(a => {
+      {filteredActs.map(a => {
         const fb = feedbacks[a.id] || {};
+        const totalZoneMin = a.zones ? a.zones.reduce((s,v)=>s+v,0) : 0;
         return (
           <div key={a.id} className={`si ${selected===a.id?"exp":""}`} onClick={() => setSelected(selected===a.id?null:a.id)}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
@@ -406,8 +539,30 @@ const Sessions = () => {
             </div>
             {selected===a.id && (
               <div style={{ marginTop:12, paddingTop:12, borderTop:"1px solid var(--border)" }}>
-                <div style={{ display:"flex", gap:4, marginBottom:6 }}>
-                  {a.zones.map((p,i) => <div key={i} style={{ flex:p, height:8, background:Object.values(PROFILE.zones)[i].color, borderRadius:4 }} title={`${Object.values(PROFILE.zones)[i].name}: ${p}%`} />)}
+                {/* Légende zones */}
+                <ZoneLegend />
+                {/* Barre zones avec km et % */}
+                <div style={{ display:"flex", gap:2, marginBottom:8, height:16, borderRadius:4, overflow:"hidden" }}>
+                  {a.zones && a.zones.map((p,i) => p > 0 ? (
+                    <div key={i} style={{ flex:p, background:Object.values(PROFILE.zones)[i].color, position:"relative", display:"flex", alignItems:"center", justifyContent:"center" }}
+                      title={`${Object.values(PROFILE.zones)[i].name}: ${p}%`}>
+                      {p >= 10 && <span style={{ fontSize:9, color:"rgba(255,255,255,0.8)", fontWeight:600 }}>{p}%</span>}
+                    </div>
+                  ) : null)}
+                </div>
+                {/* Détail zones */}
+                <div style={{ display:"flex", gap:8, flexWrap:"wrap", marginBottom:8 }}>
+                  {a.zones && a.zones.map((p,i) => {
+                    if (!p) return null;
+                    const durationMin = Math.round((a.duration_seconds || 0) * p / 100 / 60);
+                    const km = (a.distance * p / 100).toFixed(1);
+                    return (
+                      <div key={i} style={{ background:"var(--bg3)", border:`1px solid ${Object.values(PROFILE.zones)[i].color}44`, borderRadius:8, padding:"4px 10px", fontSize:10 }}>
+                        <span style={{ color:Object.values(PROFILE.zones)[i].color, fontWeight:600 }}>{Object.values(PROFILE.zones)[i].name}</span>
+                        <span style={{ color:"var(--text3)", marginLeft:6 }}>{km}km · {durationMin}min · {p}%</span>
+                      </div>
+                    );
+                  })}
                 </div>
                 {fb.notes && <div style={{ background:"var(--bg3)", borderRadius:8, padding:"10px 12px", fontSize:13, color:"var(--text2)", lineHeight:1.6, marginTop:8 }}>💬 {fb.notes}</div>}
               </div>
@@ -458,27 +613,43 @@ const Wellness = () => {
 
   if (loading) return <Loader />;
 
-  const today = wellness[0] || {};
-  const sleepToday = sleep[0] || {};
+  const todaySleep = sleep.find(s => s.total_hours > 0) || sleep[0] || {};
+  const todayW = wellness.find(w => w.resting_hr || w.body_battery_high || w.stress_avg != null) || wellness[0] || {};
   const last7w = wellness.slice(0,7).reverse();
   const last7s = sleep.slice(0,7).reverse();
 
   return (
     <div>
       <div className="ph"><div><div className="pt">BIEN-ÊTRE</div><div className="ps">Sommeil · Stress · HRV · Récupération</div></div></div>
+
       <div className="grid g4" style={{ marginBottom:16 }}>
         {[
-          ["Sommeil hier", sleepToday.total_hours ? `${sleepToday.total_hours}h` : "--", sleepToday.quality_score ? `Qualité ${sleepToday.quality_score}%` : ""],
-          ["FC repos", today.resting_hr ? `${today.resting_hr}` : "--", "bpm"],
-          ["Stress moy.", today.stress_avg != null ? `${today.stress_avg}` : "--", "/100"],
-          ["Body Battery", today.body_battery_high != null ? `${today.body_battery_high}` : "--", "%"],
-        ].map(([l,v,u],i) => (
-          <div key={i} className={`card ${i===0?"ca":""}`}>
+          ["Sommeil", todaySleep.total_hours ? `${todaySleep.total_hours}h` : "--", todaySleep.quality_score ? `Score ${todaySleep.quality_score}/100` : "", true],
+          ["FC repos", todaySleep.resting_hr ? `${todaySleep.resting_hr}` : "--", "bpm", false],
+          ["HRV nuit", todaySleep.hrv_overnight ? `${todaySleep.hrv_overnight.toFixed(0)}` : "--", "ms · " + (todaySleep.hrv_status || "--"), false],
+          ["Body Battery", todayW.body_battery_high != null ? `${todayW.body_battery_high}` : "--", "%", false],
+        ].map(([l,v,u,accent],i) => (
+          <div key={i} className={`card ${accent?"ca":""}`}>
             <div className="lbl">{l}</div>
-            <div className="val">{v}<span className="unit">{u}</span></div>
+            <div className="val">{v}<span className="unit" style={{ fontSize:11 }}>{u}</span></div>
           </div>
         ))}
       </div>
+
+      <div className="grid g4" style={{ marginBottom:16 }}>
+        {[
+          ["Stress moyen", todayW.stress_avg != null ? `${todayW.stress_avg}` : "--", "/100"],
+          ["Respiration", todaySleep.respiration ? `${todaySleep.respiration?.toFixed(1)}` : "--", "rpm"],
+          ["HRV 7j moy.", todaySleep.hrv_7d_avg ? `${todaySleep.hrv_7d_avg?.toFixed(0)}` : "--", "ms"],
+          ["Body Battery Δ", todaySleep.body_battery_change ? `+${todaySleep.body_battery_change}` : "--", "%"],
+        ].map(([l,v,u],i) => (
+          <div key={i} className="card">
+            <div className="lbl">{l}</div>
+            <div className="val" style={{ fontSize:28 }}>{v}<span className="unit">{u}</span></div>
+          </div>
+        ))}
+      </div>
+
       <div className="grid g2" style={{ marginBottom:16 }}>
         <div className="card">
           <div className="sec">Sommeil — 7 jours</div>
@@ -488,38 +659,51 @@ const Wellness = () => {
               <XAxis dataKey="date" tickFormatter={d=>d.slice(5)} tick={{ fill:"#4a7499", fontSize:11 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill:"#4a7499", fontSize:11 }} axisLine={false} tickLine={false} unit="h" domain={[0,10]} />
               <Tooltip content={<CT />} />
-              <Bar dataKey="total_hours" fill="#1a56db" radius={[4,4,0,0]} name="Sommeil (h)" />
+              <Bar dataKey="deep_hours" stackId="s" fill="#1e3a5f" name="Profond (h)" radius={[0,0,0,0]} />
+              <Bar dataKey="rem_hours" stackId="s" fill="#1a56db" name="REM (h)" />
+              <Bar dataKey="light_hours" stackId="s" fill="#0ea5e9" name="Léger (h)" radius={[4,4,0,0]} />
             </BarChart>
           </ResponsiveContainer>
+          <div style={{ display:"flex", gap:12, marginTop:8 }}>
+            {[["Profond","#1e3a5f"],["REM","#1a56db"],["Léger","#0ea5e9"]].map(([n,c]) => (
+              <div key={n} style={{ display:"flex", alignItems:"center", gap:4, fontSize:10, color:"var(--text3)" }}>
+                <div style={{ width:8, height:8, borderRadius:2, background:c }} />{n}
+              </div>
+            ))}
+          </div>
         </div>
         <div className="card">
-          <div className="sec">Stress — 7 jours</div>
+          <div className="sec">FC repos & HRV — 7 jours</div>
           <ResponsiveContainer width="100%" height={200}>
-            <LineChart data={last7w} margin={{ top:5, right:10, left:-20, bottom:0 }}>
+            <LineChart data={last7s} margin={{ top:5, right:10, left:-20, bottom:0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#1a3354" />
               <XAxis dataKey="date" tickFormatter={d=>d.slice(5)} tick={{ fill:"#4a7499", fontSize:11 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill:"#4a7499", fontSize:11 }} axisLine={false} tickLine={false} />
               <Tooltip content={<CT />} />
-              <Line type="monotone" dataKey="stress_avg" stroke="#f59e0b" strokeWidth={2} dot={{ r:3, fill:"#f59e0b" }} name="Stress" />
               <Line type="monotone" dataKey="resting_hr" stroke="#00d4ff" strokeWidth={2} dot={{ r:3, fill:"#00d4ff" }} name="FC repos" />
+              <Line type="monotone" dataKey="hrv_overnight" stroke="#f59e0b" strokeWidth={2} dot={{ r:3, fill:"#f59e0b" }} name="HRV nuit" />
             </LineChart>
           </ResponsiveContainer>
         </div>
       </div>
+
       <div className="card">
         <div className="sec">Détail journalier</div>
-        {last7w.reverse().map((d,i) => (
-          <div key={i} className="ri">
-            <span style={{ fontSize:13, color:"var(--text2)", width:80 }}>{d.date?.slice(5)}</span>
-            <div style={{ display:"flex", gap:20, fontSize:12, color:"var(--text3)" }}>
-              <span>🌙 {last7s.find(s=>s.date===d.date)?.total_hours || "--"}h</span>
-              <span>❤ {d.resting_hr || "--"} bpm</span>
-              <span>😤 Stress {d.stress_avg ?? "--"}</span>
-              <span>👟 {d.steps ? `${(d.steps/1000).toFixed(1)}k` : "--"} pas</span>
-              <span>🔋 {d.body_battery_high ?? "--"}%</span>
+        {last7s.slice().reverse().map((d,i) => {
+          const w = last7w.find(x => x.date === d.date) || {};
+          return (
+            <div key={i} className="ri">
+              <span style={{ fontSize:13, color:"var(--text2)", width:80 }}>{d.date?.slice(5)}</span>
+              <div style={{ display:"flex", gap:16, fontSize:12, color:"var(--text3)", flexWrap:"wrap" }}>
+                <span>🌙 {d.total_hours || "--"}h <span style={{ color:"var(--text2)" }}>{d.quality_score ? `(${d.quality_score})` : ""}</span></span>
+                <span>❤ {d.resting_hr || "--"} bpm</span>
+                <span>📊 HRV {d.hrv_overnight ? d.hrv_overnight.toFixed(0) : "--"}ms</span>
+                <span>😤 Stress {w.stress_avg ?? "--"}</span>
+                <span>🔋 {w.body_battery_high ?? "--"}%</span>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -550,17 +734,12 @@ const Plan = () => {
   const [wellness, setWellness] = useState([]);
   const [weekly, setWeekly]   = useState([]);
   const [dataLoading, setDataLoading] = useState(true);
-
-  // Step state: "config" | "analysis" | "constraints" | "plan"
   const [step, setStep]       = useState("config");
-  const [analysis, setAnalysis] = useState(null);   // texte bilan IA
+  const [analysis, setAnalysis] = useState(null);
   const [analysisLoading, setAnalysisLoading] = useState(false);
-
-  // Constraints (step 3)
   const [targetKm, setTargetKm]   = useState(50);
   const [availDays, setAvailDays] = useState({ Lundi:true, Mardi:false, Mercredi:true, Jeudi:true, Vendredi:false, Samedi:true, Dimanche:true });
   const [extraNote, setExtraNote] = useState("");
-
   const [plan, setPlan]       = useState(null);
   const [planLoading, setPlanLoading] = useState(false);
 
@@ -575,7 +754,6 @@ const Plan = () => {
       .finally(() => setDataLoading(false));
   }, []);
 
-  // ── Build shared context string ──────────────────────────────────────────────
   const buildContext = () => {
     const w0 = wellness[0] || {};
     const lastWeek = weekly[weekly.length - 1] || {};
@@ -589,20 +767,19 @@ const Plan = () => {
 - Records: 10km 42:07 | Semi 1h34:02 | Marathon 3h16:11
 - Objectif: 10km sub 40:00 (4:00/km, VDOT 54)
 
-SÉANCES RÉCENTES + FEEDBACKS SUBJJECTIFS:
+SÉANCES RÉCENTES + FEEDBACKS:
 ${sessStr}
 
 WELLNESS ACTUEL:
 - FC repos: ${w0.resting_hr || "--"} bpm
 - Stress moyen: ${w0.stress_avg ?? "--"}/100
 - Body Battery: ${w0.body_battery_high ?? "--"}%
-- Sommeil récent: ${w0.steps ? "données dispo" : "non disponible"}
+- HRV nuit: ${w0.hrv_overnight ?? "--"}ms
 
 VOLUME 4 DERNIÈRES SEMAINES: ${weekly.map(w => `${w.week_label}: ${w.km}km (${w.sessions}s)`).join(" | ")}
 Volume semaine dernière: ${lastWeek.km || "--"}km, ${lastWeek.sessions || "--"} séances`;
   };
 
-  // ── Step 2 : Analyse IA ──────────────────────────────────────────────────────
   const runAnalysis = async () => {
     setAnalysisLoading(true);
     setStep("analysis");
@@ -610,12 +787,12 @@ Volume semaine dernière: ${lastWeek.km || "--"}km, ${lastWeek.sessions || "--"}
       const ctx = buildContext();
       const text = await callClaude(
         [{ role: "user", content: `Analyse mes séances récentes et donne-moi un bilan coach avant de créer mon plan.\n\n${ctx}` }],
-        `Tu es un coach running expert pour coureurs 40+. Analyse les données Garmin ET les feedbacks subjectifs du coureur (ressentis et notes). 
+        `Tu es un coach running expert pour coureurs 40+. Analyse les données Garmin ET les feedbacks subjectifs du coureur.
 Donne un bilan structuré en 3 parties:
 1. **Points positifs** (ce qui fonctionne bien, progrès notés)
-2. **Points d'attention** (fatigue, tendances négatives, signaux d'alerte basés sur FC, stress, feedbacks)
+2. **Points d'attention** (fatigue, tendances négatives, signaux d'alerte)
 3. **Recommandations pour la semaine** (orientations générales sans encore générer le plan)
-Sois précis, cite les vraies données. Utilise les feedbacks subjectifs pour personnaliser. Max 300 mots. Réponds en français.`,
+Sois précis, cite les vraies données. Max 300 mots. Réponds en français.`,
         1200
       );
       setAnalysis(text);
@@ -625,7 +802,6 @@ Sois précis, cite les vraies données. Utilise les feedbacks subjectifs pour pe
     setAnalysisLoading(false);
   };
 
-  // ── Step 4 : Génération du plan ──────────────────────────────────────────────
   const generatePlan = async () => {
     setPlanLoading(true);
     setStep("plan");
@@ -634,44 +810,42 @@ Sois précis, cite les vraies données. Utilise les feedbacks subjectifs pour pe
       const daysStr = Object.entries(availDays).filter(([,v])=>v).map(([k])=>k).join(", ");
       const prompt = `${ctx}
 
-BILAN COACH (analyse préalable):
+BILAN COACH:
 ${analysis}
 
-CONTRAINTES DE LA SEMAINE DÉFINIES PAR L'ATHLÈTE:
+CONTRAINTES:
 - Volume cible: ${targetKm} km
-- Jours disponibles pour courir: ${daysStr}
-- Note personnelle: ${extraNote || "aucune"}
+- Jours disponibles: ${daysStr}
+- Note: ${extraNote || "aucune"}
 
-En tenant compte de TOUT ce contexte (données Garmin, feedbacks subjectifs, bilan coach, et contraintes), génère le plan.
-Réponds UNIQUEMENT en JSON valide (sans markdown, sans backticks):
+Réponds UNIQUEMENT en JSON valide:
 {
-  "summary": "Résumé 1-2 phrases du focus semaine et pourquoi ce choix",
+  "summary": "Résumé focus semaine",
   "total_km": 48,
-  "intensity_focus": "description du focus intensité",
-  "coach_note": "Note personnalisée basée sur les feedbacks subjectifs de l'athlète",
+  "intensity_focus": "description",
+  "coach_note": "Note personnalisée",
   "days": [
     {
       "day": "Lundi",
       "date": "YYYY-MM-DD",
       "type": "EF",
-      "title": "Sortie endurance fondamentale",
-      "description": "Description précise avec justification",
+      "title": "Titre",
+      "description": "Description",
       "distance_km": 10,
       "duration_min": 65,
       "pace_target": "5:45-6:00/km",
       "hr_target": "< 138 bpm",
-      "details": ["point clé 1", "point clé 2", "point clé 3"]
+      "details": ["point 1", "point 2"]
     }
   ]
 }
-Inclure 7 jours. Ne placer des séances QUE les jours disponibles (${daysStr}). Aujourd'hui: ${new Date().toLocaleDateString("fr-FR")}.`;
+Inclure 7 jours. Séances UNIQUEMENT les jours: ${daysStr}. Aujourd'hui: ${new Date().toLocaleDateString("fr-FR")}.`;
 
       const text = await callClaude([{ role: "user", content: prompt }], "Tu es un coach running expert. Réponds uniquement en JSON valide.", 2500);
       const clean = text.replace(/```json|```/g, "").trim();
       setPlan(JSON.parse(clean));
     } catch(e) {
-      console.error(e);
-      setPlan({ error: "Erreur de génération du plan. " + e.message });
+      setPlan({ error: "Erreur de génération: " + e.message });
     }
     setPlanLoading(false);
   };
@@ -691,12 +865,11 @@ Inclure 7 jours. Ne placer des séances QUE les jours disponibles (${daysStr}). 
 
   if (dataLoading) return <Loader />;
 
-  // ── Stepper indicator ────────────────────────────────────────────────────────
   const steps = [
-    { id:"config",      label:"Démarrer",  num:1 },
-    { id:"analysis",    label:"Bilan IA",  num:2 },
+    { id:"config", label:"Démarrer", num:1 },
+    { id:"analysis", label:"Bilan IA", num:2 },
     { id:"constraints", label:"Contraintes", num:3 },
-    { id:"plan",        label:"Mon plan",  num:4 },
+    { id:"plan", label:"Mon plan", num:4 },
   ];
 
   return (
@@ -707,13 +880,10 @@ Inclure 7 jours. Ne placer des séances QUE les jours disponibles (${daysStr}). 
           <div className="ps">Personnalisé · Basé sur tes données, feedbacks et disponibilités</div>
         </div>
         {step !== "config" && (
-          <button className="btn bsm" onClick={reset} style={{ background:"var(--bg3)", color:"var(--text3)", marginLeft:"auto" }}>
-            ↺ Recommencer
-          </button>
+          <button className="btn bsm" onClick={reset} style={{ background:"var(--bg3)", color:"var(--text3)", marginLeft:"auto" }}>↺ Recommencer</button>
         )}
       </div>
 
-      {/* Stepper */}
       <div style={{ display:"flex", alignItems:"center", gap:0, marginBottom:28 }}>
         {steps.map((s, i) => {
           const stepOrder = ["config","analysis","constraints","plan"];
@@ -723,25 +893,15 @@ Inclure 7 jours. Ne placer des séances QUE les jours disponibles (${daysStr}). 
           return (
             <div key={s.id} style={{ display:"flex", alignItems:"center", flex: i < steps.length-1 ? 1 : "none" }}>
               <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
-                <div style={{
-                  width:32, height:32, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center",
-                  fontSize:13, fontWeight:600,
-                  background: isDone ? "var(--green)" : isActive ? "var(--accent)" : "var(--bg3)",
-                  color: isDone||isActive ? "var(--bg)" : "var(--text3)",
-                  border: `2px solid ${isDone ? "var(--green)" : isActive ? "var(--accent)" : "var(--border)"}`,
-                  transition:"all .3s"
-                }}>{isDone ? "✓" : s.num}</div>
-                <span style={{ fontSize:10, color: isActive ? "var(--accent)" : isDone ? "var(--green)" : "var(--text3)", letterSpacing:1, whiteSpace:"nowrap" }}>{s.label}</span>
+                <div style={{ width:32,height:32,borderRadius:"50%",display:"flex",alignItems:"center",justifyContent:"center",fontSize:13,fontWeight:600,background:isDone?"var(--green)":isActive?"var(--accent)":"var(--bg3)",color:isDone||isActive?"var(--bg)":"var(--text3)",border:`2px solid ${isDone?"var(--green)":isActive?"var(--accent)":"var(--border)"}`,transition:"all .3s" }}>{isDone?"✓":s.num}</div>
+                <span style={{ fontSize:10,color:isActive?"var(--accent)":isDone?"var(--green)":"var(--text3)",letterSpacing:1,whiteSpace:"nowrap" }}>{s.label}</span>
               </div>
-              {i < steps.length-1 && (
-                <div style={{ flex:1, height:2, background: isDone ? "var(--green)" : "var(--border)", margin:"0 8px", marginBottom:16, transition:"background .3s" }} />
-              )}
+              {i < steps.length-1 && <div style={{ flex:1,height:2,background:isDone?"var(--green)":"var(--border)",margin:"0 8px",marginBottom:16,transition:"background .3s" }} />}
             </div>
           );
         })}
       </div>
 
-      {/* ── STEP 1 : Config + aperçu données ── */}
       {step === "config" && (
         <div>
           <div className="grid g4" style={{ marginBottom:20 }}>
@@ -751,16 +911,11 @@ Inclure 7 jours. Ne placer des séances QUE les jours disponibles (${daysStr}). 
               ["Volume 4 semaines", `${weekly.reduce((s,w)=>s+(w.km||0),0).toFixed(0)} km`],
               ["Stress actuel", `${wellness[0]?.stress_avg ?? "--"}/100`],
             ].map(([l,v]) => (
-              <div key={l} className="card">
-                <div className="lbl">{l}</div>
-                <div style={{ fontFamily:"var(--font-d)", fontSize:28 }}>{v}</div>
-              </div>
+              <div key={l} className="card"><div className="lbl">{l}</div><div style={{ fontFamily:"var(--font-d)", fontSize:28 }}>{v}</div></div>
             ))}
           </div>
-
-          {/* Preview feedbacks */}
           <div className="card" style={{ marginBottom:20 }}>
-            <div className="sec">Séances récentes + tes feedbacks</div>
+            <div className="sec">Séances récentes + feedbacks</div>
             {acts.slice(0,6).map(a => {
               const fb = feedbacks[a.id];
               return (
@@ -771,157 +926,86 @@ Inclure 7 jours. Ne placer des séances QUE les jours disponibles (${daysStr}). 
                     <span style={{ fontSize:12, color:"var(--text2)" }}>{a.distance}km @ {a.pace}</span>
                   </div>
                   <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-                    {fb?.feeling ? (
-                      <div style={{ display:"flex", gap:2 }}>
-                        {[1,2,3,4,5].map(n => <span key={n} style={{ fontSize:11, color: n<=fb.feeling ? "var(--accent)" : "var(--border2)" }}>★</span>)}
-                      </div>
-                    ) : <span style={{ fontSize:11, color:"var(--text3)", fontStyle:"italic" }}>Pas de feedback</span>}
+                    {fb?.feeling ? <div style={{ display:"flex", gap:2 }}>{[1,2,3,4,5].map(n=><span key={n} style={{ fontSize:11, color:n<=fb.feeling?"var(--accent)":"var(--border2)" }}>★</span>)}</div> : <span style={{ fontSize:11, color:"var(--text3)", fontStyle:"italic" }}>Pas de feedback</span>}
                     {fb?.notes && <span style={{ fontSize:11, color:"var(--text3)" }}>"{fb.notes.slice(0,40)}{fb.notes.length>40?"…":""}"</span>}
                   </div>
                 </div>
               );
             })}
-            {acts.filter(a=>feedbacks[a.id]).length === 0 && (
-              <div style={{ fontSize:12, color:"var(--text3)", padding:"8px 0", fontStyle:"italic" }}>
-                💡 Ajoute des feedbacks sur tes séances (onglet Séances) pour un plan encore plus personnalisé
-              </div>
-            )}
           </div>
-
           <div style={{ textAlign:"center" }}>
-            <button className="btn" onClick={runAnalysis} style={{ fontSize:15, padding:"14px 40px" }}>
-              🔍 Analyser mes séances
-            </button>
-            <div style={{ fontSize:12, color:"var(--text3)", marginTop:8 }}>
-              L'IA va d'abord analyser tes données avant de créer le plan
-            </div>
+            <button className="btn" onClick={runAnalysis} style={{ fontSize:15, padding:"14px 40px" }}>🔍 Analyser mes séances</button>
+            <div style={{ fontSize:12, color:"var(--text3)", marginTop:8 }}>L'IA va d'abord analyser tes données avant de créer le plan</div>
           </div>
         </div>
       )}
 
-      {/* ── STEP 2 : Analyse IA ── */}
       {step === "analysis" && (
         <div>
           <div className="card ca" style={{ marginBottom:20 }}>
             <div className="sec">Bilan coach · Analyse de tes séances</div>
-            {analysisLoading ? (
-              <div className="loading"><div className="spin"/><span>Analyse de tes données en cours...</span></div>
-            ) : (
+            {analysisLoading ? <div className="loading"><div className="spin"/><span>Analyse en cours...</span></div> : (
               <div style={{ fontSize:13, color:"var(--text2)", lineHeight:1.8, whiteSpace:"pre-wrap" }}>
                 {analysis?.split("\n").map((line, i) => {
                   const isBold = line.startsWith("**") || line.match(/^\d\./);
-                  return <div key={i} style={{ color: isBold ? "var(--text)" : "var(--text2)", fontWeight: isBold ? 600 : 400, marginBottom: line === "" ? 8 : 2 }}>{line.replace(/\*\*/g,"")}</div>;
+                  return <div key={i} style={{ color:isBold?"var(--text)":"var(--text2)", fontWeight:isBold?600:400, marginBottom:line===""?8:2 }}>{line.replace(/\*\*/g,"")}</div>;
                 })}
               </div>
             )}
           </div>
-          {!analysisLoading && (
-            <div style={{ textAlign:"center" }}>
-              <button className="btn" onClick={() => setStep("constraints")} style={{ fontSize:15, padding:"14px 40px" }}>
-                Définir mes contraintes →
-              </button>
-            </div>
-          )}
+          {!analysisLoading && <div style={{ textAlign:"center" }}><button className="btn" onClick={() => setStep("constraints")} style={{ fontSize:15, padding:"14px 40px" }}>Définir mes contraintes →</button></div>}
         </div>
       )}
 
-      {/* ── STEP 3 : Contraintes ── */}
       {step === "constraints" && (
         <div>
           <div className="card" style={{ marginBottom:20 }}>
-            <div className="sec">Volume cible pour la semaine</div>
+            <div className="sec">Volume cible</div>
             <div style={{ display:"flex", alignItems:"center", gap:16, marginBottom:8 }}>
-              <input
-                type="range" min={20} max={90} step={5} value={targetKm}
-                onChange={e => setTargetKm(Number(e.target.value))}
-                style={{ flex:1, accentColor:"var(--accent)" }}
-              />
-              <div style={{ fontFamily:"var(--font-d)", fontSize:42, color:"var(--accent)", minWidth:80, textAlign:"right" }}>
-                {targetKm}<span style={{ fontSize:16, color:"var(--text3)" }}>km</span>
-              </div>
+              <input type="range" min={20} max={90} step={5} value={targetKm} onChange={e=>setTargetKm(Number(e.target.value))} style={{ flex:1, accentColor:"var(--accent)" }} />
+              <div style={{ fontFamily:"var(--font-d)", fontSize:42, color:"var(--accent)", minWidth:80, textAlign:"right" }}>{targetKm}<span style={{ fontSize:16, color:"var(--text3)" }}>km</span></div>
             </div>
-            <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"var(--text3)" }}>
-              <span>20km (récup)</span>
-              <span>55km (normal)</span>
-              <span>90km (charge max)</span>
-            </div>
+            <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"var(--text3)" }}><span>20km (récup)</span><span>55km (normal)</span><span>90km (charge max)</span></div>
           </div>
-
           <div className="card" style={{ marginBottom:20 }}>
-            <div className="sec">Jours disponibles pour courir</div>
+            <div className="sec">Jours disponibles</div>
             <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
               {DAYS_FR.map(d => (
-                <button key={d} onClick={() => setAvailDays(prev => ({ ...prev, [d]: !prev[d] }))}
-                  style={{
-                    padding:"10px 16px", borderRadius:10, border:`1px solid ${availDays[d] ? "var(--accent)" : "var(--border)"}`,
-                    background: availDays[d] ? "rgba(0,212,255,.1)" : "var(--bg3)",
-                    color: availDays[d] ? "var(--accent)" : "var(--text3)",
-                    cursor:"pointer", fontSize:13, fontWeight: availDays[d] ? 600 : 400, transition:"all .2s"
-                  }}>
-                  {d}
-                </button>
+                <button key={d} onClick={()=>setAvailDays(prev=>({...prev,[d]:!prev[d]}))} style={{ padding:"10px 16px",borderRadius:10,border:`1px solid ${availDays[d]?"var(--accent)":"var(--border)"}`,background:availDays[d]?"rgba(0,212,255,.1)":"var(--bg3)",color:availDays[d]?"var(--accent)":"var(--text3)",cursor:"pointer",fontSize:13,fontWeight:availDays[d]?600:400,transition:"all .2s" }}>{d}</button>
               ))}
             </div>
-            <div style={{ fontSize:11, color:"var(--text3)", marginTop:10 }}>
-              {Object.values(availDays).filter(Boolean).length} jours sélectionnés
-            </div>
+            <div style={{ fontSize:11, color:"var(--text3)", marginTop:10 }}>{Object.values(availDays).filter(Boolean).length} jours sélectionnés</div>
           </div>
-
           <div className="card" style={{ marginBottom:20 }}>
             <div className="sec">Note pour le coach</div>
-            <textarea className="ta"
-              value={extraNote}
-              onChange={e => setExtraNote(e.target.value)}
-              placeholder="Ex: J'ai une compétition samedi, mes mollets sont un peu tendus, je veux du travail de côtes cette semaine..."
-              style={{ minHeight:80 }}
-            />
+            <textarea className="ta" value={extraNote} onChange={e=>setExtraNote(e.target.value)} placeholder="Ex: compétition samedi, mollets tendus..." style={{ minHeight:80 }} />
           </div>
-
-          <div style={{ textAlign:"center" }}>
-            <button className="btn" onClick={generatePlan} style={{ fontSize:15, padding:"14px 40px" }}>
-              ⚡ Générer mon plan personnalisé
-            </button>
-          </div>
+          <div style={{ textAlign:"center" }}><button className="btn" onClick={generatePlan} style={{ fontSize:15, padding:"14px 40px" }}>⚡ Générer mon plan personnalisé</button></div>
         </div>
       )}
 
-      {/* ── STEP 4 : Plan ── */}
       {step === "plan" && (
         <div>
           {planLoading ? (
             <div className="card" style={{ textAlign:"center", padding:60 }}>
               <div className="spin" style={{ margin:"0 auto 16px", width:32, height:32 }}/>
               <div style={{ fontFamily:"var(--font-d)", fontSize:22, letterSpacing:2, color:"var(--text3)" }}>GÉNÉRATION EN COURS...</div>
-              <div style={{ fontSize:12, color:"var(--text3)", marginTop:8 }}>L'IA intègre ton bilan, tes feedbacks et tes contraintes</div>
             </div>
-          ) : plan?.error ? (
-            <div className="conn-banner">⚠️ {plan.error}</div>
-          ) : plan && (
+          ) : plan?.error ? <div className="conn-banner">⚠️ {plan.error}</div> : plan && (
             <div>
-              {/* Summary card */}
               <div className="card ca" style={{ marginBottom:16 }}>
-                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:16 }}>
-                  <div style={{ flex:1 }}>
-                    <div className="lbl">Focus de la semaine</div>
-                    <div style={{ fontSize:15, color:"var(--text)", lineHeight:1.6, marginBottom:10 }}>{plan.summary}</div>
-                    {plan.coach_note && (
-                      <div style={{ background:"rgba(0,212,255,.05)", border:"1px solid rgba(0,212,255,.15)", borderRadius:10, padding:"10px 14px", fontSize:13, color:"var(--text2)", marginBottom:10, lineHeight:1.6 }}>
-                        💬 {plan.coach_note}
-                      </div>
-                    )}
-                    <div style={{ display:"flex", gap:16, fontSize:12, flexWrap:"wrap" }}>
-                      <span style={{ color:"var(--accent)" }}>🎯 {plan.intensity_focus}</span>
-                      <span style={{ color:"var(--text3)" }}>📍 <strong style={{ color:"var(--text)" }}>{plan.total_km} km</strong> sur {Object.values(availDays).filter(Boolean).length} jours</span>
-                    </div>
-                  </div>
+                <div className="lbl">Focus de la semaine</div>
+                <div style={{ fontSize:15, color:"var(--text)", lineHeight:1.6, marginBottom:10 }}>{plan.summary}</div>
+                {plan.coach_note && <div style={{ background:"rgba(0,212,255,.05)", border:"1px solid rgba(0,212,255,.15)", borderRadius:10, padding:"10px 14px", fontSize:13, color:"var(--text2)", marginBottom:10, lineHeight:1.6 }}>💬 {plan.coach_note}</div>}
+                <div style={{ display:"flex", gap:16, fontSize:12 }}>
+                  <span style={{ color:"var(--accent)" }}>🎯 {plan.intensity_focus}</span>
+                  <span style={{ color:"var(--text3)" }}>📍 <strong style={{ color:"var(--text)" }}>{plan.total_km} km</strong></span>
                 </div>
               </div>
-
-              {/* Days */}
               <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
                 {(plan.days || []).map((d, i) => (
                   <div key={i} className="card" style={{ padding:"16px 20px" }}>
-                    <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom: d.distance_km > 0 ? 10 : 0 }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom:d.distance_km>0?10:0 }}>
                       <div style={{ width:64, flexShrink:0 }}>
                         <div style={{ fontFamily:"var(--font-d)", fontSize:18, letterSpacing:1 }}>{d.day}</div>
                         <div style={{ fontSize:10, color:"var(--text3)" }}>{d.date?.slice(5)}</div>
@@ -942,11 +1026,7 @@ Inclure 7 jours. Ne placer des séances QUE les jours disponibles (${daysStr}). 
                     </div>
                     {d.details?.length > 0 && (
                       <div style={{ paddingLeft:76, display:"flex", flexWrap:"wrap", gap:6 }}>
-                        {d.details.map((pt, j) => (
-                          <span key={j} style={{ fontSize:11, color:"var(--text3)", background:"var(--bg3)", padding:"3px 10px", borderRadius:20, border:"1px solid var(--border)" }}>
-                            {pt}
-                          </span>
-                        ))}
+                        {d.details.map((pt, j) => <span key={j} style={{ fontSize:11, color:"var(--text3)", background:"var(--bg3)", padding:"3px 10px", borderRadius:20, border:"1px solid var(--border)" }}>{pt}</span>)}
                       </div>
                     )}
                   </div>
@@ -980,42 +1060,22 @@ const Coach = () => {
   useEffect(() => { endRef.current?.scrollIntoView({ behavior:"smooth" }); }, [msgs]);
 
   const buildSystem = () => {
-    const sessStr = acts.slice(0,8).map(a =>
-      `- ${a.date}: ${a.type} ${a.distance}km @ ${a.pace}, FC ${a.avg_hr}bpm (max ${a.max_hr}), D+ ${a.elevation_gain?.toFixed(0)}m, nom: ${a.name}`
-    ).join("\n");
+    const sessStr = acts.slice(0,8).map(a => `- ${a.date}: ${a.type} ${a.distance}km @ ${a.pace}, FC ${a.avg_hr}bpm (max ${a.max_hr}), D+ ${a.elevation_gain?.toFixed(0)}m`).join("\n");
     const w0 = wellness[0] || {};
-    return `Tu es un coach running expert et data analyst spécialisé pour les coureurs de 40+. Tu analyses les données Garmin réelles de Benjamin.
+    return `Tu es un coach running expert pour coureurs 40+. Tu analyses les données Garmin réelles de Benjamin.
 
-PROFIL:
-- Benjamin, 46 ans, 176cm, 72kg, basé à Tower Hamlets (Londres)
-- FC max: 174 bpm
-- Records: 10km 42:07, semi 1h34:02, marathon 3h16:11 (VDOT ~52)
-- Objectif principal: 10km sub 40:00 (allure 4:00/km, VDOT ~54)
-- Objectif secondaire: semi sub 1h30, marathon sub 3h10
+PROFIL: 46 ans, 176cm, 72kg, FCmax 174, Records: 10km 42:07, semi 1h34:02, marathon 3h16:11, VDOT ~52
+OBJECTIF: 10km sub 40:00 (4:00/km, VDOT ~54)
 
-DONNÉES RÉCENTES (vraies données Garmin):
+SÉANCES RÉCENTES:
 ${sessStr}
 
-WELLNESS AUJOURD'HUI:
-- FC repos: ${w0.resting_hr || "--"} bpm
-- Stress moyen: ${w0.stress_avg ?? "--"}/100
-- Body Battery: ${w0.body_battery_high ?? "--"}%
-- Pas: ${w0.steps ? Math.round(w0.steps/1000)+"k" : "--"}
+WELLNESS: FC repos ${w0.resting_hr||"--"}bpm · Stress ${w0.stress_avg??"--"}/100 · Body Battery ${w0.body_battery_high??"--"}% · HRV ${w0.hrv_overnight??"--"}ms
 
-ZONES FC:
-- Z1 Récup: < 122 bpm
-- Z2 EF: 122-139 bpm  
-- Z3 Tempo: 139-152 bpm
-- Z4 Seuil: 152-162 bpm
-- Z5 VMA: 162-174 bpm
+ZONES FC: Z1<122 | Z2 122-139 | Z3 139-152 | Z4 152-162 | Z5 162-174
+ALLURES: EF 5:30-6:00/km | Tempo 4:45-5:00 | Seuil 4:20-4:30 | VMA 3:55-4:05
 
-ALLURES CIBLES:
-- EF: 5:30-6:00/km (FC < 138)
-- Tempo: 4:45-5:00/km
-- Seuil: 4:20-4:30/km
-- VMA (400m): 3:55-4:05/km
-
-Réponds en français. Sois précis, personnalisé, utilise les vraies données. Donne des conseils actionnables avec allures/FC précises. Max 250 mots.`;
+Réponds en français. Précis, personnalisé, cite les vraies données. Max 250 mots.`;
   };
 
   const send = async () => {
@@ -1028,59 +1088,32 @@ Réponds en français. Sois précis, personnalisé, utilise les vraies données.
       const history = msgs.filter((m,i) => i > 0).map(m => ({ role: m.role==="ai"?"assistant":"user", content: m.text }));
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method:"POST",
-        headers:{
-          "Content-Type":"application/json",
-          "x-api-key": window.ANTHROPIC_KEY || "",
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true"
-        },
-        body: JSON.stringify({
-          model:"claude-sonnet-4-20250514",
-          max_tokens:1000,
-          system: buildSystem(),
-          messages: [...history, { role:"user", content:userMsg }]
-        })
+        headers:{ "Content-Type":"application/json", "x-api-key": window.ANTHROPIC_KEY || "", "anthropic-version": "2023-06-01", "anthropic-dangerous-direct-browser-access": "true" },
+        body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:1000, system: buildSystem(), messages: [...history, { role:"user", content:userMsg }] })
       });
       const data = await res.json();
-      const text = data.content?.map(c=>c.text||"").join("") || "Erreur API.";
-      setMsgs(prev => [...prev, { role:"ai", text }]);
+      setMsgs(prev => [...prev, { role:"ai", text: data.content?.map(c=>c.text||"").join("")||"Erreur API." }]);
     } catch(e) {
       setMsgs(prev => [...prev, { role:"ai", text:"Erreur de connexion à l'API Claude." }]);
     }
     setLoading(false);
   };
 
-  const suggestions = ["Analyse mes dernières séances","Que faire ce soir ?","Comment progresser vers sub 40 ?","Mon stress affecte-t-il mes perfs ?","Explique ma séance du 05/03"];
+  const suggestions = ["Analyse mes dernières séances","Que faire ce soir ?","Comment progresser vers sub 40 ?","Mon stress affecte-t-il mes perfs ?"];
 
   return (
     <div>
       <div className="ph"><div><div className="pt">COACH IA</div><div className="ps">Analyse tes vraies données Garmin en temps réel</div></div></div>
-      {apiKeyMissing && (
-        <div className="conn-banner" style={{ marginBottom: 16 }}>
-          ⚠️ Clé API manquante — ajoute <code style={{ background:"rgba(0,0,0,.3)", padding:"1px 6px", borderRadius:4 }}>window.ANTHROPIC_KEY = "sk-ant-..."</code> dans la console ou configure-la dans le déploiement
-        </div>
-      )}
+      {apiKeyMissing && <div className="conn-banner" style={{ marginBottom:16 }}>⚠️ Clé API manquante</div>}
       <div className="grid g3" style={{ marginBottom:20 }}>
-        <div className="card ca">
-          <div className="lbl">Séances ce mois</div>
-          <div className="val">{acts.length}<span className="unit">séances</span></div>
-        </div>
-        <div className="card">
-          <div className="lbl">Distance totale</div>
-          <div className="val">{acts.reduce((s,a)=>s+a.distance,0).toFixed(0)}<span className="unit">km</span></div>
-        </div>
-        <div className="card">
-          <div className="lbl">FC moy. globale</div>
-          <div className="val">{acts.length ? Math.round(acts.filter(a=>a.avg_hr).reduce((s,a)=>s+a.avg_hr,0)/acts.filter(a=>a.avg_hr).length) : "--"}<span className="unit">bpm</span></div>
-        </div>
+        <div className="card ca"><div className="lbl">Séances ce mois</div><div className="val">{acts.length}<span className="unit">séances</span></div></div>
+        <div className="card"><div className="lbl">Distance totale</div><div className="val">{acts.reduce((s,a)=>s+a.distance,0).toFixed(0)}<span className="unit">km</span></div></div>
+        <div className="card"><div className="lbl">FC moy. globale</div><div className="val">{acts.length?Math.round(acts.filter(a=>a.avg_hr).reduce((s,a)=>s+a.avg_hr,0)/acts.filter(a=>a.avg_hr).length):"--"}<span className="unit">bpm</span></div></div>
       </div>
       <div style={{ marginBottom:12 }}>
         <div className="sec">Questions rapides</div>
         <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
-          {suggestions.map(s => (
-            <button key={s} onClick={() => setInput(s)} className="btn bsm"
-              style={{ background:"var(--bg3)", color:"var(--text2)", border:"1px solid var(--border2)" }}>{s}</button>
-          ))}
+          {suggestions.map(s => <button key={s} onClick={()=>setInput(s)} className="btn bsm" style={{ background:"var(--bg3)", color:"var(--text2)", border:"1px solid var(--border2)" }}>{s}</button>)}
         </div>
       </div>
       <div className="chat">
@@ -1109,10 +1142,7 @@ export default function App() {
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    fetch(`${API}/auth/status`)
-      .then(r => r.json())
-      .then(d => setConnected(d.connected))
-      .catch(() => setConnected(false));
+    fetch(`${API}/auth/status`).then(r=>r.json()).then(d=>setConnected(d.connected)).catch(()=>setConnected(false));
   }, []);
 
   const nav = [
@@ -1130,7 +1160,7 @@ export default function App() {
         <nav className="sidebar">
           <div className="logo">STRIDE</div>
           {nav.map(n => (
-            <button key={n.id} className={`nav ${page===n.id?"active":""}`} onClick={() => setPage(n.id)}>
+            <button key={n.id} className={`nav ${page===n.id?"active":""}`} onClick={()=>setPage(n.id)}>
               <span style={{ fontSize:20 }}>{n.icon}</span>
               <span className="tip">{n.label}</span>
             </button>
