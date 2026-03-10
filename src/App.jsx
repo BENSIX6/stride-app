@@ -122,11 +122,14 @@ const CT = ({ active, payload, label }) => {
   );
 };
 
-const ZBar = ({ name, minutes, max, color }) => (
+const ZBar = ({ name, value, pct, max, color, unit = "min" }) => (
   <div className="zrow">
     <span className="zn">{name}</span>
-    <div className="zbw"><div className="zb" style={{ width: `${max ? (minutes / max) * 100 : 0}%`, background: color }} /></div>
-    <span className="zt">{minutes}min</span>
+    <div className="zbw"><div className="zb" style={{ width: `${max ? (value / max) * 100 : 0}%`, background: color }} /></div>
+    <span className="zt" style={{ width: 70, textAlign: "right", fontSize: 10 }}>
+      <span style={{ color: "var(--text2)" }}>{value}{unit}</span>
+      {pct != null && <span style={{ color: "var(--text3)", marginLeft: 4 }}>({pct}%)</span>}
+    </span>
   </div>
 );
 
@@ -176,6 +179,7 @@ const Dashboard = ({ connected }) => {
   const cw = summary?.current_week || {};
   const cm = summary?.current_month || {};
   const pm = summary?.prev_month || {};
+  const pmLabel = summary?.prev_month_label || "Mars 2024";
   const wd = summary?.wellness_today || {};
   const diff = ((cm.km || 0) - (pm.km || 0)).toFixed(1);
   const diffPct = pm.km ? (((cm.km - pm.km) / pm.km) * 100).toFixed(1) : 0;
@@ -208,18 +212,18 @@ const Dashboard = ({ connected }) => {
           <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 6 }}>{cm.sessions || 0} séances</div>
         </div>
         <div className="card">
-          <div className="lbl">Mois précédent</div>
+          <div className="lbl">{pmLabel}</div>
           <div className="val">{pm.km || 0}<span className="unit">km</span></div>
           <div className="pb"><div className="pf" style={{ width: `${Math.min((pm.km||0)/150*100, 100)}%`, background:"linear-gradient(90deg,#1a3354,#1a56db)" }} /></div>
           <div style={{ fontSize: 11, color: "var(--text3)", marginTop: 6 }}>{pm.sessions || 0} séances</div>
         </div>
         <div className="card">
-          <div className="lbl">Progression</div>
+          <div className="lbl">vs {pmLabel}</div>
           <div className="val" style={{ color: diff >= 0 ? "var(--green)" : "var(--red)" }}>
             {diff >= 0 ? "+" : ""}{diff}<span className="unit">km</span>
           </div>
           <div style={{ fontSize: 12, color: diff >= 0 ? "var(--green)" : "var(--red)", marginTop: 6 }}>
-            {diff >= 0 ? "↑" : "↓"} {Math.abs(diffPct)}% vs mois précédent
+            {diff >= 0 ? "↑" : "↓"} {Math.abs(diffPct)}% N-1
           </div>
         </div>
       </div>
@@ -245,14 +249,21 @@ const Dashboard = ({ connected }) => {
         </div>
         <div className="card">
           <div className="sec">Zones — Cette semaine</div>
-          {Object.entries(PROFILE.zones).map(([k, z]) => (
-            <ZBar key={k} name={z.name} minutes={lastWeek[k] || 0} max={maxZ} color={z.color} />
-          ))}
+          {Object.entries(PROFILE.zones).map(([k, z], i) => {
+            const zKeys = ["z1","z2","z3","z4","z5"];
+            const totalZ = zKeys.reduce((s, zk) => s + (lastWeek[zk] || 0), 0);
+            const val = lastWeek[zKeys[i]] || 0;
+            const pct = totalZ ? Math.round((val / totalZ) * 100) : 0;
+            return <ZBar key={k} name={z.name} value={val} pct={pct} max={maxZ} color={z.color} />;
+          })}
           <div style={{ borderTop: "1px solid var(--border)", paddingTop: 12, marginTop: 12 }}>
             <div className="sec" style={{ marginBottom: 8 }}>Intensité</div>
-            {[["🟦 EF", "ef", "#1a56db"], ["🔵 Seuil", "seuil", "#0ea5e9"], ["⚡ VMA", "vma", "#00d4ff"]].map(([n, k, c]) => (
-              <ZBar key={k} name={n} minutes={lastWeek[k] || 0} max={(lastWeek.ef||0)+(lastWeek.seuil||0)+(lastWeek.vma||0)} color={c} />
-            ))}
+            {[["🟦 EF", "ef", "#1a56db"], ["🔵 Seuil", "seuil", "#0ea5e9"], ["⚡ VMA", "vma", "#00d4ff"]].map(([n, k, c]) => {
+              const totalInt = (lastWeek.ef||0)+(lastWeek.seuil||0)+(lastWeek.vma||0);
+              const val = lastWeek[k] || 0;
+              const pct = totalInt ? Math.round((val / totalInt) * 100) : 0;
+              return <ZBar key={k} name={n} value={val} pct={pct} max={totalInt} color={c} />;
+            })}
           </div>
         </div>
       </div>
@@ -293,8 +304,8 @@ const Dashboard = ({ connected }) => {
           <div className="sec">Bien-être aujourd'hui</div>
           {[
             ["❤ FC repos", wd.resting_hr ? `${wd.resting_hr} bpm` : "--"],
-            ["😤 Stress moy.", wd.stress != null ? `${wd.stress}/100` : "--"],
-            ["🔋 Body Battery", wd.body_battery != null ? `${wd.body_battery}%` : "--"],
+            ["😤 Stress moy.", wd.stress_avg != null ? `${wd.stress_avg}/100` : wd.stress != null ? `${wd.stress}/100` : "--"],
+            ["🔋 Body Battery", wd.body_battery_high != null ? `${wd.body_battery_high}%` : wd.body_battery != null ? `${wd.body_battery}%` : "--"],
             ["👟 Pas", wd.steps ? `${(wd.steps/1000).toFixed(1)}k` : "--"],
           ].map(([l, v]) => (
             <div key={l} className="ri">
@@ -514,6 +525,441 @@ const Wellness = () => {
   );
 };
 
+// ── PLAN SEMAINE ──────────────────────────────────────────────────────────────
+const DAYS_FR = ["Lundi","Mardi","Mercredi","Jeudi","Vendredi","Samedi","Dimanche"];
+
+const callClaude = async (messages, system, maxTokens = 1500) => {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": window.ANTHROPIC_KEY || "",
+      "anthropic-version": "2023-06-01",
+      "anthropic-dangerous-direct-browser-access": "true"
+    },
+    body: JSON.stringify({ model: "claude-sonnet-4-20250514", max_tokens: maxTokens, system, messages })
+  });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.content?.map(c => c.text || "").join("") || "";
+};
+
+const Plan = () => {
+  const [acts, setActs]       = useState([]);
+  const [feedbacks, setFeedbacks] = useState({});
+  const [wellness, setWellness] = useState([]);
+  const [weekly, setWeekly]   = useState([]);
+  const [dataLoading, setDataLoading] = useState(true);
+
+  // Step state: "config" | "analysis" | "constraints" | "plan"
+  const [step, setStep]       = useState("config");
+  const [analysis, setAnalysis] = useState(null);   // texte bilan IA
+  const [analysisLoading, setAnalysisLoading] = useState(false);
+
+  // Constraints (step 3)
+  const [targetKm, setTargetKm]   = useState(50);
+  const [availDays, setAvailDays] = useState({ Lundi:true, Mardi:false, Mercredi:true, Jeudi:true, Vendredi:false, Samedi:true, Dimanche:true });
+  const [extraNote, setExtraNote] = useState("");
+
+  const [plan, setPlan]       = useState(null);
+  const [planLoading, setPlanLoading] = useState(false);
+
+  useEffect(() => {
+    Promise.all([
+      apiFetch("/activities?days=28"),
+      apiFetch("/feedback"),
+      apiFetch("/wellness?days=7"),
+      apiFetch("/stats/weekly?weeks=4"),
+    ]).then(([a, f, w, wk]) => { setActs(a); setFeedbacks(f); setWellness(w); setWeekly(wk); })
+      .catch(console.error)
+      .finally(() => setDataLoading(false));
+  }, []);
+
+  // ── Build shared context string ──────────────────────────────────────────────
+  const buildContext = () => {
+    const w0 = wellness[0] || {};
+    const lastWeek = weekly[weekly.length - 1] || {};
+    const sessStr = acts.slice(0, 12).map(a => {
+      const fb = feedbacks[a.id];
+      const fbStr = fb ? ` | Ressenti: ${["","Très difficile","Difficile","Correct","Bon","Excellent"][fb.feeling] || fb.feeling}${fb.notes ? ` — "${fb.notes}"` : ""}` : "";
+      return `- ${a.date}: ${a.type} ${a.distance}km @ ${a.pace}, FC moy ${a.avg_hr}bpm (max ${a.max_hr}), D+ ${a.elevation_gain?.toFixed(0)}m${fbStr}`;
+    }).join("\n");
+    return `PROFIL BENJAMIN:
+- 46 ans, 176cm, 72kg, FCmax 174bpm, VDOT ~52
+- Records: 10km 42:07 | Semi 1h34:02 | Marathon 3h16:11
+- Objectif: 10km sub 40:00 (4:00/km, VDOT 54)
+
+SÉANCES RÉCENTES + FEEDBACKS SUBJJECTIFS:
+${sessStr}
+
+WELLNESS ACTUEL:
+- FC repos: ${w0.resting_hr || "--"} bpm
+- Stress moyen: ${w0.stress_avg ?? "--"}/100
+- Body Battery: ${w0.body_battery_high ?? "--"}%
+- Sommeil récent: ${w0.steps ? "données dispo" : "non disponible"}
+
+VOLUME 4 DERNIÈRES SEMAINES: ${weekly.map(w => `${w.week_label}: ${w.km}km (${w.sessions}s)`).join(" | ")}
+Volume semaine dernière: ${lastWeek.km || "--"}km, ${lastWeek.sessions || "--"} séances`;
+  };
+
+  // ── Step 2 : Analyse IA ──────────────────────────────────────────────────────
+  const runAnalysis = async () => {
+    setAnalysisLoading(true);
+    setStep("analysis");
+    try {
+      const ctx = buildContext();
+      const text = await callClaude(
+        [{ role: "user", content: `Analyse mes séances récentes et donne-moi un bilan coach avant de créer mon plan.\n\n${ctx}` }],
+        `Tu es un coach running expert pour coureurs 40+. Analyse les données Garmin ET les feedbacks subjectifs du coureur (ressentis et notes). 
+Donne un bilan structuré en 3 parties:
+1. **Points positifs** (ce qui fonctionne bien, progrès notés)
+2. **Points d'attention** (fatigue, tendances négatives, signaux d'alerte basés sur FC, stress, feedbacks)
+3. **Recommandations pour la semaine** (orientations générales sans encore générer le plan)
+Sois précis, cite les vraies données. Utilise les feedbacks subjectifs pour personnaliser. Max 300 mots. Réponds en français.`,
+        1200
+      );
+      setAnalysis(text);
+    } catch(e) {
+      setAnalysis("Erreur d'analyse. Vérifie la clé API Anthropic.");
+    }
+    setAnalysisLoading(false);
+  };
+
+  // ── Step 4 : Génération du plan ──────────────────────────────────────────────
+  const generatePlan = async () => {
+    setPlanLoading(true);
+    setStep("plan");
+    try {
+      const ctx = buildContext();
+      const daysStr = Object.entries(availDays).filter(([,v])=>v).map(([k])=>k).join(", ");
+      const prompt = `${ctx}
+
+BILAN COACH (analyse préalable):
+${analysis}
+
+CONTRAINTES DE LA SEMAINE DÉFINIES PAR L'ATHLÈTE:
+- Volume cible: ${targetKm} km
+- Jours disponibles pour courir: ${daysStr}
+- Note personnelle: ${extraNote || "aucune"}
+
+En tenant compte de TOUT ce contexte (données Garmin, feedbacks subjectifs, bilan coach, et contraintes), génère le plan.
+Réponds UNIQUEMENT en JSON valide (sans markdown, sans backticks):
+{
+  "summary": "Résumé 1-2 phrases du focus semaine et pourquoi ce choix",
+  "total_km": 48,
+  "intensity_focus": "description du focus intensité",
+  "coach_note": "Note personnalisée basée sur les feedbacks subjectifs de l'athlète",
+  "days": [
+    {
+      "day": "Lundi",
+      "date": "YYYY-MM-DD",
+      "type": "EF",
+      "title": "Sortie endurance fondamentale",
+      "description": "Description précise avec justification",
+      "distance_km": 10,
+      "duration_min": 65,
+      "pace_target": "5:45-6:00/km",
+      "hr_target": "< 138 bpm",
+      "details": ["point clé 1", "point clé 2", "point clé 3"]
+    }
+  ]
+}
+Inclure 7 jours. Ne placer des séances QUE les jours disponibles (${daysStr}). Aujourd'hui: ${new Date().toLocaleDateString("fr-FR")}.`;
+
+      const text = await callClaude([{ role: "user", content: prompt }], "Tu es un coach running expert. Réponds uniquement en JSON valide.", 2500);
+      const clean = text.replace(/```json|```/g, "").trim();
+      setPlan(JSON.parse(clean));
+    } catch(e) {
+      console.error(e);
+      setPlan({ error: "Erreur de génération du plan. " + e.message });
+    }
+    setPlanLoading(false);
+  };
+
+  const reset = () => { setStep("config"); setAnalysis(null); setPlan(null); };
+
+  const typeColor = {
+    "Repos": "var(--text3)", "EF": "var(--blue1)", "Tempo": "var(--blue3)",
+    "Seuil": "var(--blue4)", "VMA": "var(--accent)", "Sortie longue": "var(--orange)",
+    "Récupération": "var(--green)"
+  };
+  const dayBadge = (type) => ({
+    background: `${typeColor[type] || "var(--border2)"}22`,
+    color: typeColor[type] || "var(--text3)",
+    border: `1px solid ${typeColor[type] || "var(--border2)"}55`,
+  });
+
+  if (dataLoading) return <Loader />;
+
+  // ── Stepper indicator ────────────────────────────────────────────────────────
+  const steps = [
+    { id:"config",      label:"Démarrer",  num:1 },
+    { id:"analysis",    label:"Bilan IA",  num:2 },
+    { id:"constraints", label:"Contraintes", num:3 },
+    { id:"plan",        label:"Mon plan",  num:4 },
+  ];
+
+  return (
+    <div>
+      <div className="ph">
+        <div>
+          <div className="pt">PLAN SEMAINE</div>
+          <div className="ps">Personnalisé · Basé sur tes données, feedbacks et disponibilités</div>
+        </div>
+        {step !== "config" && (
+          <button className="btn bsm" onClick={reset} style={{ background:"var(--bg3)", color:"var(--text3)", marginLeft:"auto" }}>
+            ↺ Recommencer
+          </button>
+        )}
+      </div>
+
+      {/* Stepper */}
+      <div style={{ display:"flex", alignItems:"center", gap:0, marginBottom:28 }}>
+        {steps.map((s, i) => {
+          const stepOrder = ["config","analysis","constraints","plan"];
+          const current = stepOrder.indexOf(step);
+          const isActive = s.id === step;
+          const isDone = stepOrder.indexOf(s.id) < current;
+          return (
+            <div key={s.id} style={{ display:"flex", alignItems:"center", flex: i < steps.length-1 ? 1 : "none" }}>
+              <div style={{ display:"flex", flexDirection:"column", alignItems:"center", gap:4 }}>
+                <div style={{
+                  width:32, height:32, borderRadius:"50%", display:"flex", alignItems:"center", justifyContent:"center",
+                  fontSize:13, fontWeight:600,
+                  background: isDone ? "var(--green)" : isActive ? "var(--accent)" : "var(--bg3)",
+                  color: isDone||isActive ? "var(--bg)" : "var(--text3)",
+                  border: `2px solid ${isDone ? "var(--green)" : isActive ? "var(--accent)" : "var(--border)"}`,
+                  transition:"all .3s"
+                }}>{isDone ? "✓" : s.num}</div>
+                <span style={{ fontSize:10, color: isActive ? "var(--accent)" : isDone ? "var(--green)" : "var(--text3)", letterSpacing:1, whiteSpace:"nowrap" }}>{s.label}</span>
+              </div>
+              {i < steps.length-1 && (
+                <div style={{ flex:1, height:2, background: isDone ? "var(--green)" : "var(--border)", margin:"0 8px", marginBottom:16, transition:"background .3s" }} />
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── STEP 1 : Config + aperçu données ── */}
+      {step === "config" && (
+        <div>
+          <div className="grid g4" style={{ marginBottom:20 }}>
+            {[
+              ["Séances analysées", `${acts.length}`],
+              ["Avec feedback", `${acts.filter(a=>feedbacks[a.id]).length} / ${acts.length}`],
+              ["Volume 4 semaines", `${weekly.reduce((s,w)=>s+(w.km||0),0).toFixed(0)} km`],
+              ["Stress actuel", `${wellness[0]?.stress_avg ?? "--"}/100`],
+            ].map(([l,v]) => (
+              <div key={l} className="card">
+                <div className="lbl">{l}</div>
+                <div style={{ fontFamily:"var(--font-d)", fontSize:28 }}>{v}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Preview feedbacks */}
+          <div className="card" style={{ marginBottom:20 }}>
+            <div className="sec">Séances récentes + tes feedbacks</div>
+            {acts.slice(0,6).map(a => {
+              const fb = feedbacks[a.id];
+              return (
+                <div key={a.id} className="ri">
+                  <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                    <span className={badgeClass(a.type)} style={{ fontSize:9 }}>{a.type}</span>
+                    <span style={{ fontSize:12, color:"var(--text3)" }}>{a.date}</span>
+                    <span style={{ fontSize:12, color:"var(--text2)" }}>{a.distance}km @ {a.pace}</span>
+                  </div>
+                  <div style={{ display:"flex", gap:8, alignItems:"center" }}>
+                    {fb?.feeling ? (
+                      <div style={{ display:"flex", gap:2 }}>
+                        {[1,2,3,4,5].map(n => <span key={n} style={{ fontSize:11, color: n<=fb.feeling ? "var(--accent)" : "var(--border2)" }}>★</span>)}
+                      </div>
+                    ) : <span style={{ fontSize:11, color:"var(--text3)", fontStyle:"italic" }}>Pas de feedback</span>}
+                    {fb?.notes && <span style={{ fontSize:11, color:"var(--text3)" }}>"{fb.notes.slice(0,40)}{fb.notes.length>40?"…":""}"</span>}
+                  </div>
+                </div>
+              );
+            })}
+            {acts.filter(a=>feedbacks[a.id]).length === 0 && (
+              <div style={{ fontSize:12, color:"var(--text3)", padding:"8px 0", fontStyle:"italic" }}>
+                💡 Ajoute des feedbacks sur tes séances (onglet Séances) pour un plan encore plus personnalisé
+              </div>
+            )}
+          </div>
+
+          <div style={{ textAlign:"center" }}>
+            <button className="btn" onClick={runAnalysis} style={{ fontSize:15, padding:"14px 40px" }}>
+              🔍 Analyser mes séances
+            </button>
+            <div style={{ fontSize:12, color:"var(--text3)", marginTop:8 }}>
+              L'IA va d'abord analyser tes données avant de créer le plan
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── STEP 2 : Analyse IA ── */}
+      {step === "analysis" && (
+        <div>
+          <div className="card ca" style={{ marginBottom:20 }}>
+            <div className="sec">Bilan coach · Analyse de tes séances</div>
+            {analysisLoading ? (
+              <div className="loading"><div className="spin"/><span>Analyse de tes données en cours...</span></div>
+            ) : (
+              <div style={{ fontSize:13, color:"var(--text2)", lineHeight:1.8, whiteSpace:"pre-wrap" }}>
+                {analysis?.split("\n").map((line, i) => {
+                  const isBold = line.startsWith("**") || line.match(/^\d\./);
+                  return <div key={i} style={{ color: isBold ? "var(--text)" : "var(--text2)", fontWeight: isBold ? 600 : 400, marginBottom: line === "" ? 8 : 2 }}>{line.replace(/\*\*/g,"")}</div>;
+                })}
+              </div>
+            )}
+          </div>
+          {!analysisLoading && (
+            <div style={{ textAlign:"center" }}>
+              <button className="btn" onClick={() => setStep("constraints")} style={{ fontSize:15, padding:"14px 40px" }}>
+                Définir mes contraintes →
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── STEP 3 : Contraintes ── */}
+      {step === "constraints" && (
+        <div>
+          <div className="card" style={{ marginBottom:20 }}>
+            <div className="sec">Volume cible pour la semaine</div>
+            <div style={{ display:"flex", alignItems:"center", gap:16, marginBottom:8 }}>
+              <input
+                type="range" min={20} max={90} step={5} value={targetKm}
+                onChange={e => setTargetKm(Number(e.target.value))}
+                style={{ flex:1, accentColor:"var(--accent)" }}
+              />
+              <div style={{ fontFamily:"var(--font-d)", fontSize:42, color:"var(--accent)", minWidth:80, textAlign:"right" }}>
+                {targetKm}<span style={{ fontSize:16, color:"var(--text3)" }}>km</span>
+              </div>
+            </div>
+            <div style={{ display:"flex", justifyContent:"space-between", fontSize:11, color:"var(--text3)" }}>
+              <span>20km (récup)</span>
+              <span>55km (normal)</span>
+              <span>90km (charge max)</span>
+            </div>
+          </div>
+
+          <div className="card" style={{ marginBottom:20 }}>
+            <div className="sec">Jours disponibles pour courir</div>
+            <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+              {DAYS_FR.map(d => (
+                <button key={d} onClick={() => setAvailDays(prev => ({ ...prev, [d]: !prev[d] }))}
+                  style={{
+                    padding:"10px 16px", borderRadius:10, border:`1px solid ${availDays[d] ? "var(--accent)" : "var(--border)"}`,
+                    background: availDays[d] ? "rgba(0,212,255,.1)" : "var(--bg3)",
+                    color: availDays[d] ? "var(--accent)" : "var(--text3)",
+                    cursor:"pointer", fontSize:13, fontWeight: availDays[d] ? 600 : 400, transition:"all .2s"
+                  }}>
+                  {d}
+                </button>
+              ))}
+            </div>
+            <div style={{ fontSize:11, color:"var(--text3)", marginTop:10 }}>
+              {Object.values(availDays).filter(Boolean).length} jours sélectionnés
+            </div>
+          </div>
+
+          <div className="card" style={{ marginBottom:20 }}>
+            <div className="sec">Note pour le coach</div>
+            <textarea className="ta"
+              value={extraNote}
+              onChange={e => setExtraNote(e.target.value)}
+              placeholder="Ex: J'ai une compétition samedi, mes mollets sont un peu tendus, je veux du travail de côtes cette semaine..."
+              style={{ minHeight:80 }}
+            />
+          </div>
+
+          <div style={{ textAlign:"center" }}>
+            <button className="btn" onClick={generatePlan} style={{ fontSize:15, padding:"14px 40px" }}>
+              ⚡ Générer mon plan personnalisé
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── STEP 4 : Plan ── */}
+      {step === "plan" && (
+        <div>
+          {planLoading ? (
+            <div className="card" style={{ textAlign:"center", padding:60 }}>
+              <div className="spin" style={{ margin:"0 auto 16px", width:32, height:32 }}/>
+              <div style={{ fontFamily:"var(--font-d)", fontSize:22, letterSpacing:2, color:"var(--text3)" }}>GÉNÉRATION EN COURS...</div>
+              <div style={{ fontSize:12, color:"var(--text3)", marginTop:8 }}>L'IA intègre ton bilan, tes feedbacks et tes contraintes</div>
+            </div>
+          ) : plan?.error ? (
+            <div className="conn-banner">⚠️ {plan.error}</div>
+          ) : plan && (
+            <div>
+              {/* Summary card */}
+              <div className="card ca" style={{ marginBottom:16 }}>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", gap:16 }}>
+                  <div style={{ flex:1 }}>
+                    <div className="lbl">Focus de la semaine</div>
+                    <div style={{ fontSize:15, color:"var(--text)", lineHeight:1.6, marginBottom:10 }}>{plan.summary}</div>
+                    {plan.coach_note && (
+                      <div style={{ background:"rgba(0,212,255,.05)", border:"1px solid rgba(0,212,255,.15)", borderRadius:10, padding:"10px 14px", fontSize:13, color:"var(--text2)", marginBottom:10, lineHeight:1.6 }}>
+                        💬 {plan.coach_note}
+                      </div>
+                    )}
+                    <div style={{ display:"flex", gap:16, fontSize:12, flexWrap:"wrap" }}>
+                      <span style={{ color:"var(--accent)" }}>🎯 {plan.intensity_focus}</span>
+                      <span style={{ color:"var(--text3)" }}>📍 <strong style={{ color:"var(--text)" }}>{plan.total_km} km</strong> sur {Object.values(availDays).filter(Boolean).length} jours</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Days */}
+              <div style={{ display:"flex", flexDirection:"column", gap:8 }}>
+                {(plan.days || []).map((d, i) => (
+                  <div key={i} className="card" style={{ padding:"16px 20px" }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:12, marginBottom: d.distance_km > 0 ? 10 : 0 }}>
+                      <div style={{ width:64, flexShrink:0 }}>
+                        <div style={{ fontFamily:"var(--font-d)", fontSize:18, letterSpacing:1 }}>{d.day}</div>
+                        <div style={{ fontSize:10, color:"var(--text3)" }}>{d.date?.slice(5)}</div>
+                      </div>
+                      <span className="badge" style={dayBadge(d.type)}>{d.type}</span>
+                      <div style={{ flex:1 }}>
+                        <div style={{ fontSize:13, fontWeight:600 }}>{d.title}</div>
+                        <div style={{ fontSize:12, color:"var(--text3)" }}>{d.description}</div>
+                      </div>
+                      {d.distance_km > 0 && (
+                        <div style={{ display:"flex", gap:12, fontSize:12, color:"var(--text2)", flexShrink:0, flexWrap:"wrap", justifyContent:"flex-end" }}>
+                          <span>📍 {d.distance_km}km</span>
+                          <span>⏱ {d.duration_min}min</span>
+                          {d.pace_target && d.pace_target !== "--" && <span style={{ color:"var(--accent)" }}>⚡ {d.pace_target}</span>}
+                          {d.hr_target && d.hr_target !== "--" && <span>♥ {d.hr_target}</span>}
+                        </div>
+                      )}
+                    </div>
+                    {d.details?.length > 0 && (
+                      <div style={{ paddingLeft:76, display:"flex", flexWrap:"wrap", gap:6 }}>
+                        {d.details.map((pt, j) => (
+                          <span key={j} style={{ fontSize:11, color:"var(--text3)", background:"var(--bg3)", padding:"3px 10px", borderRadius:20, border:"1px solid var(--border)" }}>
+                            {pt}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
 // ── COACH IA ──────────────────────────────────────────────────────────────────
 const Coach = () => {
   const [msgs, setMsgs] = useState([{ role:"ai", text:`Bonjour Benjamin ! 👋 Je suis ton coach IA.\n\nJ'ai accès à tes vraies données Garmin — tes séances, ton sommeil, ton stress et ta FC repos.\n\nTon profil : 46 ans, VDOT ~52, objectif 10km sub 40:00. Pose-moi n'importe quelle question sur ton entraînement !` }]);
@@ -521,9 +967,11 @@ const Coach = () => {
   const [loading, setLoading] = useState(false);
   const [acts, setActs] = useState([]);
   const [wellness, setWellness] = useState([]);
+  const [apiKeyMissing, setApiKeyMissing] = useState(false);
   const endRef = useRef(null);
 
   useEffect(() => {
+    if (!window.ANTHROPIC_KEY) setApiKeyMissing(true);
     Promise.all([apiFetch("/activities?days=30"), apiFetch("/wellness?days=7")])
       .then(([a, w]) => { setActs(a); setWellness(w); })
       .catch(console.error);
@@ -580,7 +1028,12 @@ Réponds en français. Sois précis, personnalisé, utilise les vraies données.
       const history = msgs.filter((m,i) => i > 0).map(m => ({ role: m.role==="ai"?"assistant":"user", content: m.text }));
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method:"POST",
-        headers:{ "Content-Type":"application/json" },
+        headers:{
+          "Content-Type":"application/json",
+          "x-api-key": window.ANTHROPIC_KEY || "",
+          "anthropic-version": "2023-06-01",
+          "anthropic-dangerous-direct-browser-access": "true"
+        },
         body: JSON.stringify({
           model:"claude-sonnet-4-20250514",
           max_tokens:1000,
@@ -602,6 +1055,11 @@ Réponds en français. Sois précis, personnalisé, utilise les vraies données.
   return (
     <div>
       <div className="ph"><div><div className="pt">COACH IA</div><div className="ps">Analyse tes vraies données Garmin en temps réel</div></div></div>
+      {apiKeyMissing && (
+        <div className="conn-banner" style={{ marginBottom: 16 }}>
+          ⚠️ Clé API manquante — ajoute <code style={{ background:"rgba(0,0,0,.3)", padding:"1px 6px", borderRadius:4 }}>window.ANTHROPIC_KEY = "sk-ant-..."</code> dans la console ou configure-la dans le déploiement
+        </div>
+      )}
       <div className="grid g3" style={{ marginBottom:20 }}>
         <div className="card ca">
           <div className="lbl">Séances ce mois</div>
@@ -661,6 +1119,7 @@ export default function App() {
     { id:"dashboard", icon:"📊", label:"Dashboard" },
     { id:"sessions",  icon:"🏃", label:"Séances" },
     { id:"wellness",  icon:"💤", label:"Bien-être" },
+    { id:"plan",      icon:"📅", label:"Plan semaine" },
     { id:"coach",     icon:"🤖", label:"Coach IA" },
   ];
 
@@ -681,6 +1140,7 @@ export default function App() {
           {page==="dashboard" && <Dashboard connected={connected} />}
           {page==="sessions"  && <Sessions />}
           {page==="wellness"  && <Wellness />}
+          {page==="plan"      && <Plan />}
           {page==="coach"     && <Coach />}
         </main>
       </div>
