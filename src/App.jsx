@@ -6,13 +6,13 @@ const PROFILE = {
   name: "Benjamin",
   age: 46, height: 176, weight: 72, maxHR: 174,
   records: { "10km": "42:07", "Semi": "1h34:02", "Marathon": "3h16:11" },
-  zones: {
+ zones: {
     z1: { name: "Z1 Récup",  color: "#1e3a5f" },
     z2: { name: "Z2 EF",     color: "#1a56db" },
-    z3: { name: "Z3 Tempo",  color: "#0ea5e9" },
-    z4: { name: "Z4 Seuil",  color: "#38bdf8" },
+    z3: { name: "Z3 Seuil",  color: "#0ea5e9" },
+    z4: { name: "Z4 Tempo",  color: "#38bdf8" },
     z5: { name: "Z5 VMA",    color: "#7dd3fc" },
-  },
+},
 };
 
 const css = `
