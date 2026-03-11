@@ -713,7 +713,7 @@ const Wellness = () => {
           ["Sommeil", todaySleep.total_hours ? `${todaySleep.total_hours}h` : "--", todaySleep.quality_score ? `Score ${todaySleep.quality_score}/100` : "", true],
           ["FC repos", todaySleep.resting_hr ? `${todaySleep.resting_hr}` : "--", "bpm", false],
           ["HRV nuit", todaySleep.hrv_overnight ? `${todaySleep.hrv_overnight.toFixed(0)}` : "--", "ms · " + (todaySleep.hrv_status || "--"), false],
-          ["Body Battery", todayW.body_battery_high != null ? `${todayW.body_battery_high}` : "--", "%", false],
+          ["BB pic au réveil", todayW.body_battery_peak != null ? `${todayW.body_battery_peak}` : "--", "%", false],
         ].map(([l,v,u,accent],i) => (
           <div key={i} className={`card ${accent?"ca":""}`}>
             <div className="lbl">{l}</div>
@@ -727,7 +727,7 @@ const Wellness = () => {
           ["Stress moyen", todayW.stress_avg != null ? `${todayW.stress_avg}` : "--", "/100"],
           ["Respiration", todaySleep.respiration ? `${todaySleep.respiration?.toFixed(1)}` : "--", "rpm"],
           ["HRV 7j moy.", todaySleep.hrv_7d_avg ? `${todaySleep.hrv_7d_avg?.toFixed(0)}` : "--", "ms"],
-          ["Body Battery Δ", todaySleep.body_battery_change ? `+${todaySleep.body_battery_change}` : "--", "%"],
+          ["BB rechargé nuit", todayW.body_battery_charged != null ? `+${todayW.body_battery_charged}` : "--", "%"],
         ].map(([l,v,u],i) => (
           <div key={i} className="card">
             <div className="lbl">{l}</div>
