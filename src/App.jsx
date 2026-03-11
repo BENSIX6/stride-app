@@ -700,7 +700,7 @@ const Wellness = () => {
   if (loading) return <Loader />;
 
   const todaySleep = sleep.find(s => s.total_hours > 0) || sleep[0] || {};
-  const todayW = wellness.find(w => w.resting_hr || w.body_battery_high || w.stress_avg != null) || wellness[0] || {};
+  const todayW = wellness.find(w => w.resting_hr || w.body_battery_peak || w.stress_avg != null) || wellness[0] || {};
   const last7w = wellness.slice(0,7).reverse();
   const last7s = sleep.slice(0,7).reverse();
 
@@ -711,8 +711,8 @@ const Wellness = () => {
       <div className="grid g4" style={{ marginBottom:16 }}>
         {[
           ["Sommeil", todaySleep.total_hours ? `${todaySleep.total_hours}h` : "--", todaySleep.quality_score ? `Score ${todaySleep.quality_score}/100` : "", true],
-          ["FC repos", todaySleep.resting_hr ? `${todaySleep.resting_hr}` : "--", "bpm", false],
-          ["HRV nuit", todaySleep.hrv_overnight ? `${todaySleep.hrv_overnight.toFixed(0)}` : "--", "ms · " + (todaySleep.hrv_status || "--"), false],
+          ["FC repos", todayW.resting_hr ? `${todayW.resting_hr}` : "--", "bpm", false],
+          ["HRV nuit", todayW.hrv_overnight ? `${todayW.hrv_overnight.toFixed(0)}` : "--", "ms · " + (todayW.hrv_status || "--"), false],
           ["BB pic au réveil", todayW.body_battery_peak != null ? `${todayW.body_battery_peak}` : "--", "%", false],
         ].map(([l,v,u,accent],i) => (
           <div key={i} className={`card ${accent?"ca":""}`}>
@@ -725,8 +725,8 @@ const Wellness = () => {
       <div className="grid g4" style={{ marginBottom:16 }}>
         {[
           ["Stress moyen", todayW.stress_avg != null ? `${todayW.stress_avg}` : "--", "/100"],
-          ["Respiration", todaySleep.respiration ? `${todaySleep.respiration?.toFixed(1)}` : "--", "rpm"],
-          ["HRV 7j moy.", todaySleep.hrv_7d_avg ? `${todaySleep.hrv_7d_avg?.toFixed(0)}` : "--", "ms"],
+          ["Respiration", todayW.respiration ? `${todayW.respiration?.toFixed(1)}` : "--", "rpm"],
+          ["HRV 7j moy.", todayW.hrv_7d_avg ? `${todayW.hrv_7d_avg?.toFixed(0)}` : "--", "ms"],
           ["BB rechargé nuit", todayW.body_battery_charged != null ? `+${todayW.body_battery_charged}` : "--", "%"],
         ].map(([l,v,u],i) => (
           <div key={i} className="card">
