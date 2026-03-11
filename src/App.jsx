@@ -379,8 +379,93 @@ const Dashboard = ({ connected }) => {
     </div>
   );
 };
+const LapsDetail = ({ activityId, type }) => {
+  const [laps, setLaps] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [show, setShow] = useState(false);
 
+  const load = async () => {
+    if (laps) { setShow(!show); return; }
+    setLoading(true);
+    try {
+      const data = await apiFetch(`/activities/${activityId}/laps`);
+      setLaps(data);
+      setShow(true);
+    } catch(e) { console.error(e); }
+    setLoading(false);
+  };
+
+  const activeLaps = laps?.filter(l => l.intensity === "ACTIVE") || [];
+  const warmupLaps = laps?.filter(l => l.intensity === "WARMUP") || [];
+  const cooldownLaps = laps?.filter(l => l.intensity === "COOLDOWN") || [];
+  const recoveryLaps = laps?.filter(l => l.intensity === "RECOVERY") || [];
+
+  const intensityColor = {
+    "ACTIVE": "var(--accent)",
+    "RECOVERY": "var(--blue3)",
+    "WARMUP": "var(--text3)",
+    "COOLDOWN": "var(--text3)",
+  };
+
+  return (
+    <div style={{ marginTop:8 }}>
+      <button className="btn bsm" onClick={load} disabled={loading}
+        style={{ background:"var(--bg3)", color:"var(--text2)", border:"1px solid var(--border2)", marginBottom:8 }}>
+        {loading ? "⏳ Chargement..." : show ? "▲ Masquer les laps" : "▼ Voir les laps"}
+      </button>
+      {show && laps && (
+        <div>
+          {/* Résumé fractions si séance fractionnée */}
+          {activeLaps.length > 0 && (
+            <div style={{ background:"rgba(0,212,255,.05)", border:"1px solid rgba(0,212,255,.15)", borderRadius:10, padding:"10px 14px", marginBottom:8 }}>
+              <div style={{ fontSize:10, color:"var(--accent)", letterSpacing:1, fontWeight:600, marginBottom:6 }}>
+                ⚡ {activeLaps.length} FRACTIONS · {activeLaps[0]?.distance}m
+              </div>
+              <div style={{ display:"flex", gap:6, flexWrap:"wrap" }}>
+                {activeLaps.map((l, i) => (
+                  <div key={i} style={{ background:"var(--bg3)", border:"1px solid rgba(0,212,255,.2)", borderRadius:8, padding:"4px 10px", fontSize:11, textAlign:"center" }}>
+                    <div style={{ color:"var(--accent)", fontWeight:600 }}>{l.pace}</div>
+                    <div style={{ color:"var(--text3)", fontSize:10 }}>♥ {l.avg_hr}</div>
+                  </div>
+                ))}
+              </div>
+              <div style={{ fontSize:11, color:"var(--text3)", marginTop:6 }}>
+                Allure moy. fractions : <span style={{ color:"var(--text2)" }}>
+                  {(() => {
+                    const totalSec = activeLaps.reduce((s,l)=>s+l.duration_sec,0);
+                    const totalDist = activeLaps.reduce((s,l)=>s+l.distance,0);
+                    const avgPaceSec = totalDist > 0 ? (totalSec / totalDist * 1000) : 0;
+                    const m = Math.floor(avgPaceSec/60), s = Math.round(avgPaceSec%60);
+                    return `${m}:${s.toString().padStart(2,"0")}/km`;
+                  })()}
+                </span>
+                {" · "}FC moy. : <span style={{ color:"var(--text2)" }}>
+                  {Math.round(activeLaps.reduce((s,l)=>s+l.avg_hr,0)/activeLaps.length)} bpm
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Tous les laps */}
+          <div style={{ display:"flex", flexDirection:"column", gap:2 }}>
+            {laps.map((l, i) => (
+              <div key={i} style={{ display:"flex", gap:10, alignItems:"center", padding:"5px 8px", borderRadius:6, background: l.intensity==="ACTIVE" ? "rgba(0,212,255,.05)" : "transparent", fontSize:11 }}>
+                <span style={{ width:20, color:"var(--text3)", textAlign:"right" }}>{l.lap_index}</span>
+                <span style={{ width:70, color: intensityColor[l.intensity] || "var(--text3)", fontWeight: l.intensity==="ACTIVE"?600:400, fontSize:10 }}>{l.intensity}</span>
+                <span style={{ width:45, color:"var(--text3)" }}>{l.distance}m</span>
+                <span style={{ width:60, color: l.intensity==="ACTIVE" ? "var(--accent)" : "var(--text2)", fontWeight: l.intensity==="ACTIVE"?600:400 }}>{l.pace}</span>
+                <span style={{ width:55, color:"var(--text3)" }}>♥ {l.avg_hr}</span>
+                <span style={{ color:"var(--text3)" }}>⟳ {l.cadence}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
 // ── SESSIONS ──────────────────────────────────────────────────────────────────
+
 const Sessions = () => {
   const [acts, setActs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -564,6 +649,7 @@ const Sessions = () => {
                     );
                   })}
                 </div>
+                <LapsDetail activityId={a.id} type={a.type} />
                 {fb.notes && <div style={{ background:"var(--bg3)", borderRadius:8, padding:"10px 12px", fontSize:13, color:"var(--text2)", lineHeight:1.6, marginTop:8 }}>💬 {fb.notes}</div>}
               </div>
             )}
