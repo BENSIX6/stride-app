@@ -409,7 +409,7 @@ const LapsDetail = ({ activityId, type }) => {
 
   return (
     <div style={{ marginTop:8 }}>
-      <button className="btn bsm" onClick={load} disabled={loading}
+      <button className="btn bsm" onClick={(e) => { e.stopPropagation(); load(); }} disabled={loading}
         style={{ background:"var(--bg3)", color:"var(--text2)", border:"1px solid var(--border2)", marginBottom:8 }}>
         {loading ? "⏳ Chargement..." : show ? "▲ Masquer les laps" : "▼ Voir les laps"}
       </button>
