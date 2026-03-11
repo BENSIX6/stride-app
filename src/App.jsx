@@ -710,7 +710,7 @@ const Wellness = () => {
 
       <div className="grid g4" style={{ marginBottom:16 }}>
         {[
-          ["Sommeil", todaySleep.total_hours ? `${todaySleep.total_hours}h` : "--", todaySleep.quality_score ? `Score ${todaySleep.quality_score}/100` : "", true],
+          ["Sommeil", todayW.sleep_hours ? `${todayW.sleep_hours}h` : "--", todayW.sleep_score ? `Score ${todayW.sleep_score}/100` : "", true],
           ["FC repos", todayW.resting_hr ? `${todayW.resting_hr}` : "--", "bpm", false],
           ["HRV nuit", todayW.hrv_overnight ? `${todayW.hrv_overnight.toFixed(0)}` : "--", "ms · " + (todayW.hrv_status || "--"), false],
           ["BB pic au réveil", todayW.body_battery_peak != null ? `${todayW.body_battery_peak}` : "--", "%", false],
