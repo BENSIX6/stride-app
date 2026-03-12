@@ -474,6 +474,7 @@ const Sessions = () => {
   const [modal, setModal] = useState(null);
   const [tmpFeel, setTmpFeel] = useState(0);
   const [tmpNotes, setTmpNotes] = useState("");
+  const [tmpType, setTmpType] = useState("");
   const [filterMode, setFilterMode] = useState("ytd");
   const [filterMonth, setFilterMonth] = useState("");
   const [filterWeek, setFilterWeek] = useState("");
@@ -486,10 +487,8 @@ const Sessions = () => {
   }, []);
 
   const saveFeedback = async () => {
-    await fetch(`${API}/activities/${modal.id}/feedback?feeling=${tmpFeel}&notes=${encodeURIComponent(tmpNotes)}`, { method: "POST" });
-    setFeedbacks(prev => ({ ...prev, [modal.id]: { feeling: tmpFeel, notes: tmpNotes } }));
-    setModal(null);
-  };
+   await fetch(`${API}/activities/${modal.id}/feedback?feeling=${tmpFeel}&notes=${encodeURIComponent(tmpNotes)}&type=${encodeURIComponent(tmpType)}`, { method: "POST" });
+setFeedbacks(prev => ({ ...prev, [modal.id]: { feeling: tmpFeel, notes: tmpNotes, type: tmpType } }));
 
   // Filtrage
   const today = new Date();
@@ -612,7 +611,7 @@ const Sessions = () => {
               </div>
               <div style={{ display:"flex", gap:8, alignItems:"center" }}>
                 {fb.feeling ? <Stars value={fb.feeling} /> : <span style={{ fontSize:11, color:"var(--text3)" }}>Pas de feedback</span>}
-                <button className="btn bsm" onClick={e => { e.stopPropagation(); setModal(a); setTmpFeel(fb.feeling||0); setTmpNotes(fb.notes||""); }}>✏ Feedback</button>
+                <button className="btn bsm" onClick={e => { e.stopPropagation(); setModal(a); setTmpFeel(fb.feeling||0); setTmpNotes(fb.notes||""); setTmpType(fb.type||a.type||""); }}>✏ Feedback</button>
               </div>
             </div>
             <div style={{ display:"flex", gap:16, fontSize:12, color:"var(--text2)" }}>
@@ -662,6 +661,17 @@ const Sessions = () => {
           <div className="modal" onClick={e=>e.stopPropagation()}>
             <div style={{ fontFamily:"var(--font-d)", fontSize:28, letterSpacing:2, marginBottom:16 }}>FEEDBACK SÉANCE</div>
             <div style={{ fontSize:13, color:"var(--text3)", marginBottom:16 }}>{modal.type} · {modal.date} · {modal.distance}km · {modal.name}</div>
+            <div style={{ marginBottom:16 }}>
+  <div style={{ fontSize:12, color:"var(--text3)", marginBottom:8, letterSpacing:1 }}>TYPE DE SÉANCE</div>
+  <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+    {["EF","Tempo","Seuil","VMA","Sortie longue"].map(t => (
+      <button key={t} onClick={() => setTmpType(t)}
+        style={{ padding:"8px 14px", borderRadius:10, border:`1px solid ${tmpType===t?"var(--accent)":"var(--border)"}`, background:tmpType===t?"rgba(0,212,255,.1)":"var(--bg3)", color:tmpType===t?"var(--accent)":"var(--text3)", cursor:"pointer", fontSize:12, fontWeight:tmpType===t?600:400, transition:"all .2s" }}>
+        {t}
+      </button>
+    ))}
+  </div>
+</div>
             <div style={{ fontSize:12, color:"var(--text3)", marginBottom:8, letterSpacing:1 }}>SENSATIONS</div>
             <div style={{ display:"flex", gap:8, alignItems:"center" }}>
               {[1,2,3,4,5].map(n => (
