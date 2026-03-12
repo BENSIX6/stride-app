@@ -153,7 +153,7 @@ const Loader = () => (
   <div className="loading"><div className="spin"/><span>Chargement des données Garmin...</span></div>
 );
 
-const  = (type) => {
+const badgeClass = (type) => {
   const m = { "EF":"bEF","VMA":"bVMA","Seuil":"bSeuil","Tempo":"bTempo","Sortie longue":"bSortie" };
   return `badge ${m[type] || "bEF"}`;
 };
