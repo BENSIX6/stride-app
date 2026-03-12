@@ -1158,22 +1158,26 @@ const Coach = () => {
   useEffect(() => { endRef.current?.scrollIntoView({ behavior:"smooth" }); }, [msgs]);
 
   const buildSystem = () => {
-    const sessStr = acts.slice(0,8).map(a => `- ${a.date}: ${a.type} ${a.distance}km @ ${a.pace}, FC ${a.avg_hr}bpm (max ${a.max_hr}), D+ ${a.elevation_gain?.toFixed(0)}m`).join("\n");
+    const sessStr = acts.slice(0,15).map(a => {
+      const feelingLabel = ["","Très difficile","Difficile","Correct","Bon","Excellent"][a.feeling] || "";
+      const fbStr = a.feeling ? ` | Ressenti: ${feelingLabel}${a.notes ? ` — "${a.notes}"` : ""}` : "";
+      return `- ${a.date}: ${a.type} ${a.distance}km @ ${a.pace}, FC ${a.avg_hr}bpm (max ${a.max_hr}), D+ ${a.elevation?.toFixed(0)}m${fbStr}`;
+    }).join("\n");
     const w0 = wellness[0] || {};
     return `Tu es un coach running expert pour coureurs 40+. Tu analyses les données Garmin réelles de Benjamin.
 
 PROFIL: 46 ans, 176cm, 72kg, FCmax 174, Records: 10km 42:07, semi 1h34:02, marathon 3h16:11, VDOT ~52
 OBJECTIF: 10km sub 40:00 (4:00/km, VDOT ~54)
 
-SÉANCES RÉCENTES:
+SÉANCES RÉCENTES (avec feedbacks):
 ${sessStr}
 
-WELLNESS: FC repos ${w0.resting_hr||"--"}bpm · Stress ${w0.stress_avg??"--"}/100 · Body Battery ${w0.body_battery_high??"--"}% · HRV ${w0.hrv_overnight??"--"}ms
+WELLNESS: FC repos ${w0.resting_hr||"--"}bpm · Stress ${w0.stress_avg??"--"}/100 · Body Battery ${w0.body_battery_peak??"--"}% · HRV ${w0.hrv_overnight??"--"}ms · Sommeil ${w0.sleep_hours??"--"}h
 
-ZONES FC: Z1<122 | Z2 122-139 | Z3 139-152 | Z4 152-162 | Z5 162-174
+ZONES FC: Z1<126 | Z2 126-145 | Z3 146-160 | Z4 161-175 | Z5>175
 ALLURES: EF 5:30-6:00/km | Tempo 4:45-5:00 | Seuil 4:20-4:30 | VMA 3:55-4:05
 
-Réponds en français. Précis, personnalisé, cite les vraies données. Max 250 mots.`;
+Réponds en français. Précis, personnalisé, cite les vraies données et feedbacks. Max 250 mots.`;
   };
 
   const send = async () => {
