@@ -1150,8 +1150,8 @@ const Coach = () => {
 
   useEffect(() => {
     if (!window.ANTHROPIC_KEY) setApiKeyMissing(true);
-    Promise.all([apiFetch("/activities?days=30"), apiFetch("/wellness?days=7")])
-      .then(([a, w]) => { setActs(a); setWellness(w); })
+    apiFetch("/coach/context")
+      .then(ctx => { setActs(ctx.sessions || []); setWellness(ctx.wellness || []); })
       .catch(console.error);
   }, []);
 
