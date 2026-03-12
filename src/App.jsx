@@ -153,7 +153,7 @@ const Loader = () => (
   <div className="loading"><div className="spin"/><span>Chargement des données Garmin...</span></div>
 );
 
-const badgeClass = (type) => {
+const  = (type) => {
   const m = { "EF":"bEF","VMA":"bVMA","Seuil":"bSeuil","Tempo":"bTempo","Sortie longue":"bSortie" };
   return `badge ${m[type] || "bEF"}`;
 };
@@ -605,7 +605,7 @@ setFeedbacks(prev => ({ ...prev, [modal.id]: { feeling: tmpFeel, notes: tmpNotes
           <div key={a.id} className={`si ${selected===a.id?"exp":""}`} onClick={() => setSelected(selected===a.id?null:a.id)}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:8 }}>
               <div style={{ display:"flex", gap:8, alignItems:"center" }}>
-                <span className={badgeClass(a.type)}>{a.type}</span>
+                <span className={badgeClass(feedbacks[a.id]?.type || a.type)}>{feedbacks[a.id]?.type || a.type}</span>
                 <span style={{ fontSize:11, color:"var(--text3)" }}>{a.date}</span>
                 <span style={{ fontSize:12, color:"var(--text2)", fontWeight:500 }}>{a.name}</span>
               </div>
