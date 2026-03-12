@@ -1157,28 +1157,45 @@ const Coach = () => {
 
   useEffect(() => { endRef.current?.scrollIntoView({ behavior:"smooth" }); }, [msgs]);
 
-  const buildSystem = () => {
-    const sessStr = acts.slice(0,15).map(a => {
+const buildSystem = () => {
+  const byType = ["VMA","Seuil","Tempo","Sortie longue","EF"].map(t => {
+    const typed = acts.filter(a => a.type === t);
+    if (!typed.length) return null;
+    const lines = typed.map(a => {
       const feelingLabel = ["","Très difficile","Difficile","Correct","Bon","Excellent"][a.feeling] || "";
       const fbStr = a.feeling ? ` | Ressenti: ${feelingLabel}${a.notes ? ` — "${a.notes}"` : ""}` : "";
-      return `- ${a.date}: ${a.type} ${a.distance}km @ ${a.pace}, FC ${a.avg_hr}bpm (max ${a.max_hr}), D+ ${a.elevation?.toFixed(0)}m${fbStr}`;
+      return `  • ${a.date}: ${a.distance}km @ ${a.pace}, FC ${a.avg_hr}/${a.max_hr}bpm${fbStr}`;
     }).join("\n");
-    const w0 = wellness[0] || {};
-    return `Tu es un coach running expert pour coureurs 40+. Tu analyses les données Garmin réelles de Benjamin.
+    return `${t} (${typed.length} séances):\n${lines}`;
+  }).filter(Boolean).join("\n\n");
+
+  const stats = ["VMA","Seuil","Tempo","Sortie longue","EF"].map(t => {
+    const typed = acts.filter(a => a.type === t);
+    const km = typed.reduce((s,a) => s + a.distance, 0).toFixed(0);
+    const pct = acts.length ? Math.round(typed.length / acts.length * 100) : 0;
+    return `- ${t}: ${typed.length} séances (${pct}%) · ${km}km`;
+  }).join("\n");
+
+  const w0 = wellness[0] || {};
+  return `Tu es un coach running expert pour coureurs 40+. Tu analyses les données Garmin réelles de Benjamin.
 
 PROFIL: 46 ans, 176cm, 72kg, FCmax 174, Records: 10km 42:07, semi 1h34:02, marathon 3h16:11, VDOT ~52
 OBJECTIF: 10km sub 40:00 (4:00/km, VDOT ~54)
 
-SÉANCES RÉCENTES (avec feedbacks):
-${sessStr}
+SÉANCES PAR TYPE (avec feedbacks):
+${byType}
+
+RÉPARTITION (30 derniers jours):
+${stats}
+RATIO IDÉAL pour sub 40: 70-75% EF · 10-15% Seuil · 10% VMA · 5% Sortie longue
 
 WELLNESS: FC repos ${w0.resting_hr||"--"}bpm · Stress ${w0.stress_avg??"--"}/100 · Body Battery ${w0.body_battery_peak??"--"}% · HRV ${w0.hrv_overnight??"--"}ms · Sommeil ${w0.sleep_hours??"--"}h
 
 ZONES FC: Z1<126 | Z2 126-145 | Z3 146-160 | Z4 161-175 | Z5>175
 ALLURES: EF 5:30-6:00/km | Tempo 4:45-5:00 | Seuil 4:20-4:30 | VMA 3:55-4:05
 
-Réponds en français. Précis, personnalisé, cite les vraies données et feedbacks. Max 250 mots.`;
-  };
+Réponds en français. Précis, personnalisé, cite les vraies données et feedbacks en te basant sur tes connaissances de coach de running Max 250 mots.`;
+};
 
   const send = async () => {
     if (!input.trim() || loading) return;
