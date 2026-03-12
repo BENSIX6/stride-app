@@ -486,9 +486,11 @@ const Sessions = () => {
       .finally(() => setLoading(false));
   }, []);
 
-  const saveFeedback = async () => {
-   await fetch(`${API}/activities/${modal.id}/feedback?feeling=${tmpFeel}&notes=${encodeURIComponent(tmpNotes)}&type=${encodeURIComponent(tmpType)}`, { method: "POST" });
-setFeedbacks(prev => ({ ...prev, [modal.id]: { feeling: tmpFeel, notes: tmpNotes, type: tmpType } }));
+ const saveFeedback = async () => {
+    await fetch(`${API}/activities/${modal.id}/feedback?feeling=${tmpFeel}&notes=${encodeURIComponent(tmpNotes)}&type=${encodeURIComponent(tmpType)}`, { method: "POST" });
+    setFeedbacks(prev => ({ ...prev, [modal.id]: { feeling: tmpFeel, notes: tmpNotes, type: tmpType } }));
+    setModal(null);
+  };
 
   // Filtrage
   const today = new Date();
