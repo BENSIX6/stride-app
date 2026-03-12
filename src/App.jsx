@@ -1189,8 +1189,10 @@ RÉPARTITION (30 derniers jours):
 ${stats}
 RATIO IDÉAL pour sub 40: 70-75% EF · 10-15% Seuil · 10% VMA · 5% Sortie longue
 
-WELLNESS: FC repos ${w0.resting_hr||"--"}bpm · Stress ${w0.stress_avg??"--"}/100 · Body Battery ${w0.body_battery_peak??"--"}% · HRV ${w0.hrv_overnight??"--"}ms · Sommeil ${w0.sleep_hours??"--"}h
+WELLNESS AUJOURD'HUI: FC repos ${w0.resting_hr||"--"}bpm · Stress ${w0.stress_avg??"--"}/100 · BB ${w0.body_battery_peak??"--"}% · HRV ${w0.hrv_overnight??"--"}ms · Sommeil ${w0.sleep_hours??"--"}h
 
+TENDANCE WELLNESS 7 JOURS:
+${wellness.slice(0,7).map(w => `- ${w.date}: FC ${w.resting_hr||"--"} · HRV ${w.hrv_overnight||"--"}ms · Sommeil ${w.sleep_hours||"--"}h · Stress ${w.stress_avg||"--"}`).join("\n")}
 ZONES FC: Z1<126 | Z2 126-145 | Z3 146-160 | Z4 161-175 | Z5>175
 ALLURES: EF 5:30-6:00/km | Tempo 4:45-5:00 | Seuil 4:20-4:30 | VMA 3:55-4:05
 
