@@ -1137,7 +1137,85 @@ Inclure 7 jours. Séances UNIQUEMENT les jours: ${daysStr}. Aujourd'hui: ${new D
     </div>
   );
 };
+// ── SETTINGS ─────────────────────────────────────────────────────────────────
+const Settings = () => {
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
+  useEffect(() => {
+    apiFetch("/profile").then(p => { setProfile(p); setLoading(false); });
+  }, []);
+
+  const save = async () => {
+    setSaving(true);
+    const params = new URLSearchParams(profile).toString();
+    await fetch(`${API}/profile?${params}`, { method: "POST" });
+    setSaving(false);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const field = (label, key, type = "text") => (
+    <div className="ri">
+      <span style={{ fontSize:12, color:"var(--text3)", width:160 }}>{label}</span>
+      <input type={type} value={profile[key] || ""} onChange={e => setProfile(prev => ({ ...prev, [key]: type==="number" ? Number(e.target.value) : e.target.value }))}
+        style={{ background:"var(--bg3)", border:"1px solid var(--border2)", borderRadius:8, padding:"6px 12px", color:"var(--text)", fontSize:13, outline:"none", width:160, textAlign:"right" }} />
+    </div>
+  );
+
+  if (loading) return <Loader />;
+
+  return (
+    <div>
+      <div className="ph"><div><div className="pt">PROFIL</div><div className="ps">Tes données personnelles · Zones · Objectifs</div></div></div>
+
+      <div className="grid g2" style={{ marginBottom:16 }}>
+        <div className="card">
+          <div className="sec">Identité</div>
+          {field("Nom", "name")}
+          {field("Âge", "age", "number")}
+          {field("Taille (cm)", "height", "number")}
+          {field("Poids (kg)", "weight", "number")}
+          {field("FC max", "max_hr", "number")}
+          {field("VDOT", "vdot", "number")}
+        </div>
+        <div className="card">
+          <div className="sec">Objectif & Records</div>
+          {field("Objectif", "goal")}
+          {field("Allure cible", "goal_pace")}
+          {field("Record 10km", "record_10k")}
+          {field("Record semi", "record_half")}
+          {field("Record marathon", "record_marathon")}
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom:16 }}>
+        <div className="sec">Zones FC personnalisées</div>
+        <div className="grid g2">
+          <div>
+            {field("Z1 max", "zone1_max", "number")}
+            {field("Z2 min", "zone2_min", "number")}
+            {field("Z2 max", "zone2_max", "number")}
+          </div>
+          <div>
+            {field("Z3 min", "zone3_min", "number")}
+            {field("Z3 max", "zone3_max", "number")}
+            {field("Z4 min", "zone4_min", "number")}
+            {field("Z4 max", "zone4_max", "number")}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ textAlign:"center" }}>
+        <button className="btn" onClick={save} disabled={saving} style={{ fontSize:15, padding:"14px 40px" }}>
+          {saving ? "Sauvegarde..." : saved ? "✅ Sauvegardé !" : "Sauvegarder"}
+        </button>
+      </div>
+    </div>
+  );
+};
 // ── COACH IA ──────────────────────────────────────────────────────────────────
 const Coach = () => {
   const [msgs, setMsgs] = useState([{ role:"ai", text:`Bonjour Benjamin ! 👋 Je suis ton coach IA.\n\nJ'ai accès à tes vraies données Garmin — tes séances, ton sommeil, ton stress et ta FC repos.\n\nTon profil : 46 ans, VDOT ~52, objectif 10km sub 40:00. Pose-moi n'importe quelle question sur ton entraînement !` }]);
