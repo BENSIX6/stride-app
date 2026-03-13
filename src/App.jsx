@@ -703,7 +703,7 @@ const Wellness = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    Promise.all([apiFetch("/wellness?days=14"), apiFetch("/sleep?days=14")])
+    Promise.all([apiFetch("/wellness/history?days=14"), apiFetch("/sleep/history?days=14")])
       .then(([w, s]) => { setWellness(w); setSleep(s); })
       .catch(console.error)
       .finally(() => setLoading(false));
