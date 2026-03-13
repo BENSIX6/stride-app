@@ -1383,6 +1383,7 @@ export default function App() {
           {page==="wellness"  && <Wellness />}
           {page==="plan"      && <Plan />}
           {page==="coach"     && <Coach />}
+          {page==="settings"  && <Settings />}
         </main>
       </div>
     </>
