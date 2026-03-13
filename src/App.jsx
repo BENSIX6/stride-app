@@ -1225,15 +1225,17 @@ const Coach = () => {
   const [wellness, setWellness] = useState([]);
   const [apiKeyMissing, setApiKeyMissing] = useState(false);
   const [laps, setLaps] = useState({});
+  const [profile, setProfile] = useState({});
   const endRef = useRef(null);
 
-  useEffect(() => {
+useEffect(() => {
     if (!window.ANTHROPIC_KEY) setApiKeyMissing(true);
-    apiFetch("/coach/context")
-      .then(ctx => { 
+    Promise.all([apiFetch("/coach/context"), apiFetch("/profile")])
+      .then(([ctx, p]) => { 
         setActs(ctx.sessions || []); 
         setWellness(ctx.wellness || []); 
         setLaps(ctx.laps || {});
+        setProfile(p);
       })
       .catch(console.error);
   }, []);
@@ -1262,8 +1264,8 @@ const buildSystem = () => {
   const w0 = wellness[0] || {};
   return `Tu es un coach running expert pour coureurs 40+. Tu analyses les données Garmin réelles de Benjamin.
 
-PROFIL: 46 ans, 176cm, 72kg, FCmax 174, Records: 10km 42:07, semi 1h34:02, marathon 3h16:11, VDOT ~52
-OBJECTIF: 10km sub 40:00 (4:00/km, VDOT ~54)
+PROFIL: ${profile.age||46} ans, ${profile.height||176}cm, ${profile.weight||72}kg, FCmax ${profile.max_hr||174}, Records: 10km ${profile.record_10k||"42:07"}, semi ${profile.record_half||"1h34:02"}, marathon ${profile.record_marathon||"3h16:11"}, VDOT ${profile.vdot||52}
+OBJECTIF: ${profile.goal||"10km sub 40:00"} (${profile.goal_pace||"4:00/km"})
 
 SÉANCES PAR TYPE (avec feedbacks):
 ${byType}
@@ -1282,7 +1284,7 @@ WELLNESS AUJOURD'HUI: FC repos ${w0.resting_hr||"--"}bpm · Stress ${w0.stress_a
 
 TENDANCE WELLNESS 7 JOURS:
 ${wellness.slice(0,7).map(w => `- ${w.date}: FC ${w.resting_hr||"--"} · HRV ${w.hrv_overnight||"--"}ms · Sommeil ${w.sleep_hours||"--"}h · Stress ${w.stress_avg||"--"}`).join("\n")}
-ZONES FC: Z1<126 | Z2 126-145 | Z3 146-160 | Z4 161-175 | Z5>175
+ZONES FC: Z1<${profile.zone1_max||125} | Z2 ${profile.zone2_min||126}-${profile.zone2_max||145} | Z3 ${profile.zone3_min||146}-${profile.zone3_max||160} | Z4 ${profile.zone4_min||161}-${profile.zone4_max||175} | Z5>${profile.zone4_max||175}
 ALLURES: EF 5:30-6:00/km | Tempo 4:45-5:00 | Seuil 4:20-4:30 | VMA 3:55-4:05
 
 Réponds en français. Précis, personnalisé, cite les vraies données et feedbacks en te basant sur tes connaissances de coach de running Max 250 mots.`;
