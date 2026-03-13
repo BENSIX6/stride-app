@@ -1283,6 +1283,7 @@ export default function App() {
     { id:"wellness",  icon:"💤", label:"Bien-être" },
     { id:"plan",      icon:"📅", label:"Plan semaine" },
     { id:"coach",     icon:"🤖", label:"Coach IA" },
+    { id:"settings",  icon:"⚙️", label:"Profil" },
   ];
 
   return (
