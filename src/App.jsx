@@ -1146,12 +1146,17 @@ const Coach = () => {
   const [acts, setActs] = useState([]);
   const [wellness, setWellness] = useState([]);
   const [apiKeyMissing, setApiKeyMissing] = useState(false);
+  const [laps, setLaps] = useState({});
   const endRef = useRef(null);
 
   useEffect(() => {
     if (!window.ANTHROPIC_KEY) setApiKeyMissing(true);
     apiFetch("/coach/context")
-      .then(ctx => { setActs(ctx.sessions || []); setWellness(ctx.wellness || []); })
+      .then(ctx => { 
+        setActs(ctx.sessions || []); 
+        setWellness(ctx.wellness || []); 
+        setLaps(ctx.laps || {});
+      })
       .catch(console.error);
   }, []);
 
@@ -1184,6 +1189,12 @@ OBJECTIF: 10km sub 40:00 (4:00/km, VDOT ~54)
 
 SÉANCES PAR TYPE (avec feedbacks):
 ${byType}
+DÉTAIL FRACTIONS (séances intensives):
+${Object.entries(laps).map(([id, ls]) => {
+  const sess = acts.find(a => String(a.id || acts.indexOf(a)) === id) || {};
+  const lapStr = ls.map(l => `${l.distance}m @ ${l.pace} FC${l.avg_hr}`).join(" | ");
+  return `- ${sess.date||id} [${sess.type||"?"}]: ${lapStr}`;
+}).join("\n")}
 
 RÉPARTITION (30 derniers jours):
 ${stats}
