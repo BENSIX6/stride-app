@@ -757,7 +757,9 @@ const Wellness = () => {
               <XAxis dataKey="date" tickFormatter={d=>d.slice(5)} tick={{ fill:"#4a7499", fontSize:11 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill:"#4a7499", fontSize:11 }} axisLine={false} tickLine={false} unit="h" domain={[0,10]} />
               <Tooltip content={<CT />} />
-              <Bar dataKey="total_hours" fill="#1a56db" name="Sommeil (h)" radius={[4,4,0,0]} />
+              <Bar dataKey="deep_hours" stackId="s" fill="#7c3aed" name="Profond (h)" radius={[0,0,0,0]} />
+              <Bar dataKey="rem_hours" stackId="s" fill="#1a56db" name="REM (h)" />
+              <Bar dataKey="light_hours" stackId="s" fill="#0ea5e9" name="Léger (h)" radius={[4,4,0,0]} />
             </BarChart>
           </ResponsiveContainer>
           <div style={{ display:"flex", gap:12, marginTop:8 }}>
