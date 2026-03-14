@@ -1295,6 +1295,8 @@ RÈGLES ABSOLUES:
 5. Ne jamais féliciter sans raison objective — les compliments doivent être mérités et justifiés par les données
 6. Toujours ancrer les recommandations dans les données réelles (laps, zones FC, tendances wellness)
 7. Si les données sont insuffisantes pour conclure, le dire clairement plutôt que d'inventer
+8. CRITIQUE: Pour toute séance avec fractions (VMA, Seuil, Tempo), analyser UNIQUEMENT les données des intervalles ACTIVE — jamais la FC moyenne ou l'allure moyenne globale qui incluent échauffement et récupération. La FC moyenne d'une séance fractionnée est une donnée inutile.
+9. Quand les laps ACTIVE sont disponibles, les utiliser systématiquement pour évaluer l'intensité réelle, la progression entre les fractions, et la tenue de l'effort.
 
 FORMAT: Analyse directe → Conclusion → Recommandation concrète. Pas de bullet points inutiles. Max 200 mots.
 
