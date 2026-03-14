@@ -763,7 +763,7 @@ const Wellness = () => {
             </BarChart>
           </ResponsiveContainer>
           <div style={{ display:"flex", gap:12, marginTop:8 }}>
-            {[["Profond","#1e3a5f"],["REM","#1a56db"],["Léger","#0ea5e9"]].map(([n,c]) => (
+            {[["Profond","#7c3aed"],["REM","#1a56db"],["Léger","#0ea5e9"]].map(([n,c]) => (
               <div key={n} style={{ display:"flex", alignItems:"center", gap:4, fontSize:10, color:"var(--text3)" }}>
                 <div style={{ width:8, height:8, borderRadius:2, background:c }} />{n}
               </div>
