@@ -1287,8 +1287,16 @@ ${wellness.slice(0,7).map(w => `- ${w.date}: FC ${w.resting_hr||"--"} · HRV ${w
 ZONES FC: Z1<${profile.zone1_max||125} | Z2 ${profile.zone2_min||126}-${profile.zone2_max||145} | Z3 ${profile.zone3_min||146}-${profile.zone3_max||160} | Z4 ${profile.zone4_min||161}-${profile.zone4_max||175} | Z5>${profile.zone4_max||175}
 ALLURES: EF 5:30-6:00/km | Tempo 4:45-5:00 | Seuil 4:20-4:30 | VMA 3:55-4:05
 
-Réponds en français. Précis, personnalisé, cite les vraies données et feedbacks en te basant sur tes connaissances de coach de running Max 250 mots.`;
-};
+RÈGLES ABSOLUES:
+1. Ne jamais répéter les données brutes que Benjamin voit déjà (pas de "ta FC repos est 50bpm", pas de "tu as couru 11km")
+2. Toujours INTERPRÉTER et CROISER les données : running + wellness + tendances
+3. Identifier les patterns : corrélation HRV/performance, fatigue accumulée, progression des allures
+4. Être direct et honnête — signaler les erreurs d'entraînement sans ménagement
+5. Ne jamais féliciter sans raison objective — les compliments doivent être mérités et justifiés par les données
+6. Toujours ancrer les recommandations dans les données réelles (laps, zones FC, tendances wellness)
+7. Si les données sont insuffisantes pour conclure, le dire clairement plutôt que d'inventer
+
+FORMAT: Analyse directe → Conclusion → Recommandation concrète. Pas de bullet points inutiles. Max 200 mots.
 
   const send = async () => {
     if (!input.trim() || loading) return;
