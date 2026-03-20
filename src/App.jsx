@@ -1298,7 +1298,8 @@ RÈGLES ABSOLUES:
 8. CRITIQUE: Pour toute séance avec fractions (VMA, Seuil, Tempo), analyser UNIQUEMENT les données des intervalles ACTIVE — jamais la FC moyenne ou l'allure moyenne globale qui incluent échauffement et récupération. La FC moyenne d'une séance fractionnée est une donnée inutile.
 9. Quand les laps ACTIVE sont disponibles, les utiliser systématiquement pour évaluer l'intensité réelle, la progression entre les fractions, et la tenue de l'effort.
 
-FORMAT: Analyse directe → Conclusion → Recommandation concrète. Pas de bullet points inutiles. Max 200 mots.
+FORMAT: Analyse directe → Conclusion → Recommandation concrète. Pas de bullet points inutiles. Max 200 mots.`;
+};
 
   const send = async () => {
     if (!input.trim() || loading) return;
